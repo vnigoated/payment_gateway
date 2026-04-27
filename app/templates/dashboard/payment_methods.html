@@ -1,0 +1,201 @@
+{% extends "dashboard/base.html" %}
+{% block title %}Payment Methods{% endblock %}
+{% block nav_pm %}active{% endblock %}
+{% block page_title %}Payment Methods{% endblock %}
+
+{% block content %}
+<p style="color:var(--text-muted);margin-bottom:24px;font-size:15px">
+  Add your UPI ID or bank account. These appear on your customer-facing payment pages.
+</p>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
+
+  <!-- Add UPI -->
+  <div class="card">
+    <div class="card-header"><span class="card-title">📱 Add UPI ID</span></div>
+    <div id="upi-alert" class="alert"></div>
+    <form id="upi-form">
+      <div class="form-group">
+        <label>UPI ID *</label>
+        <input type="text" id="upi_id" placeholder="yourbiz@okaxis" required>
+        <p class="form-hint">e.g. name@okaxis, name@ybl, name@paytm</p>
+      </div>
+      <div class="form-group">
+        <label>Display name *</label>
+        <input type="text" id="upi_name" placeholder="Shown in UPI apps" required>
+      </div>
+      <div class="form-group">
+        <label>Label</label>
+        <input type="text" id="upi_label" placeholder="e.g. Business UPI" value="Business UPI">
+      </div>
+      <div class="form-group" style="margin-bottom:16px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:400">
+          <input type="checkbox" id="upi_default" style="width:auto"> Set as default
+        </label>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block" id="upi-btn">Add UPI ID</button>
+    </form>
+  </div>
+
+  <!-- Add Bank -->
+  <div class="card">
+    <div class="card-header"><span class="card-title">🏦 Add Bank Account</span></div>
+    <div id="bank-alert" class="alert"></div>
+    <form id="bank-form">
+      <div class="form-group">
+        <label>Bank name *</label>
+        <input type="text" id="bank_name" placeholder="e.g. HDFC Bank" required>
+      </div>
+      <div class="form-group">
+        <label>Account holder name *</label>
+        <input type="text" id="account_holder" required>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Account number *</label>
+          <input type="text" id="account_number" required>
+        </div>
+        <div class="form-group">
+          <label>IFSC code *</label>
+          <input type="text" id="ifsc_code" placeholder="HDFC0001234" style="text-transform:uppercase" required>
+        </div>
+      </div>
+      <div class="form-row" style="margin-bottom:4px">
+        <div class="form-group">
+          <label>Account type</label>
+          <select id="account_type">
+            <option value="current">Current</option>
+            <option value="savings">Savings</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Label</label>
+          <input type="text" id="bank_label" placeholder="e.g. HDFC Current" value="Business Account">
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:16px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:400">
+          <input type="checkbox" id="bank_default" style="width:auto"> Set as default
+        </label>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block" id="bank-btn">Add Bank Account</button>
+    </form>
+  </div>
+</div>
+
+<!-- Existing methods -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Your payment methods</span></div>
+  <div id="methods-list">
+    <div style="text-align:center;padding:24px;color:var(--text-muted)">Loading…</div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadMethods() {
+  try {
+    const methods = await API.get('/payment-methods');
+    const el = document.getElementById('methods-list');
+
+    if (!methods.length) {
+      el.innerHTML = `<div class="empty-state">
+        <div class="empty-icon">💳</div>
+        <h3>No payment methods yet</h3>
+        <p>Add a UPI ID or bank account to start accepting payments.</p>
+      </div>`;
+      return;
+    }
+
+    el.innerHTML = `<div style="display:flex;flex-direction:column;gap:12px">
+      ${methods.map(m => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border:1.5px solid ${m.is_default ? 'var(--primary)' : 'var(--border)'};border-radius:var(--radius);background:${m.is_default ? 'var(--primary-light)' : '#fff'}">
+          <div style="display:flex;align-items:center;gap:12px">
+            <span style="font-size:24px">${m.method_type === 'upi' ? '📱' : '🏦'}</span>
+            <div>
+              <div style="font-weight:600">${m.label} ${m.is_default ? '<span class="badge badge-blue" style="font-size:11px">default</span>' : ''}</div>
+              ${m.method_type === 'upi'
+                ? `<div style="font-size:13px;color:var(--text-muted)">${m.upi_id} · ${m.upi_name}</div>`
+                : `<div style="font-size:13px;color:var(--text-muted)">${m.bank_name} · ****${m.account_number ? m.account_number.slice(-4) : '????'} · ${m.ifsc_code}</div>`}
+            </div>
+          </div>
+          <div style="display:flex;gap:8px">
+            ${!m.is_default ? `<button class="btn btn-ghost btn-sm" onclick="setDefault('${m.id}')">Set default</button>` : ''}
+            <button class="btn btn-danger btn-sm" onclick="deleteMethod('${m.id}','${m.label}')">Remove</button>
+          </div>
+        </div>`).join('')}
+    </div>`;
+  } catch (e) {
+    document.getElementById('methods-list').innerHTML =
+      `<div style="color:var(--danger);padding:16px">${e.message}</div>`;
+  }
+}
+
+document.getElementById('upi-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  hideAlert('upi-alert');
+  const btn = document.getElementById('upi-btn');
+  btn.disabled = true; btn.textContent = 'Adding…';
+  try {
+    await API.post('/payment-methods/upi', {
+      upi_id:     document.getElementById('upi_id').value,
+      upi_name:   document.getElementById('upi_name').value,
+      label:      document.getElementById('upi_label').value || 'Business UPI',
+      is_default: document.getElementById('upi_default').checked,
+    });
+    toast('UPI ID added!');
+    document.getElementById('upi-form').reset();
+    loadMethods();
+  } catch (err) {
+    showAlert('upi-alert', err.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Add UPI ID';
+  }
+});
+
+document.getElementById('bank-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  hideAlert('bank-alert');
+  const btn = document.getElementById('bank-btn');
+  btn.disabled = true; btn.textContent = 'Adding…';
+  try {
+    await API.post('/payment-methods/bank', {
+      bank_name:       document.getElementById('bank_name').value,
+      account_holder:  document.getElementById('account_holder').value,
+      account_number:  document.getElementById('account_number').value,
+      ifsc_code:       document.getElementById('ifsc_code').value.toUpperCase(),
+      account_type:    document.getElementById('account_type').value,
+      label:           document.getElementById('bank_label').value || 'Business Account',
+      is_default:      document.getElementById('bank_default').checked,
+    });
+    toast('Bank account added!');
+    document.getElementById('bank-form').reset();
+    loadMethods();
+  } catch (err) {
+    showAlert('bank-alert', err.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Add Bank Account';
+  }
+});
+
+async function setDefault(id) {
+  try {
+    await API.patch(`/payment-methods/${id}/set-default`);
+    toast('Default payment method updated.');
+    loadMethods();
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+async function deleteMethod(id, label) {
+  if (!confirm(`Remove "${label}"?`)) return;
+  try {
+    await API.del(`/payment-methods/${id}`);
+    toast('Payment method removed.', 'info');
+    loadMethods();
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+loadMethods();
+</script>
+{% endblock %}

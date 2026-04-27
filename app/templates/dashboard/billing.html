@@ -1,0 +1,110 @@
+{% extends "dashboard/base.html" %}
+{% block title %}Billing{% endblock %}
+{% block nav_billing %}active{% endblock %}
+{% block page_title %}Billing & Plans{% endblock %}
+
+{% block content %}
+<div id="current-plan-card" class="card" style="margin-bottom:24px">
+  <div style="text-align:center;padding:16px;color:var(--text-muted)">Loading…</div>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-bottom:32px" id="plans-grid"></div>
+
+<!-- Upgrade form -->
+<div class="card" id="upgrade-card" style="display:none;max-width:540px">
+  <div class="card-header"><span class="card-title" id="upgrade-title">Upgrade</span></div>
+  <p style="color:var(--text-muted);font-size:14px;margin-bottom:20px">
+    Pay via UPI or bank transfer to our account, then submit your UTR below.
+    We'll verify and upgrade your account within 24 hours.
+  </p>
+  <div id="upgrade-alert" class="alert"></div>
+  <form id="upgrade-form">
+    <div class="form-group">
+      <label>UTR / Transaction reference *</label>
+      <input type="text" id="utr" placeholder="12-digit UTR or transaction ID" required>
+      <p class="form-hint">Find this in your bank app under transaction details.</p>
+    </div>
+    <div class="form-group">
+      <label>Note (optional)</label>
+      <input type="text" id="note" placeholder="e.g. paid via PhonePe">
+    </div>
+    <div style="display:flex;gap:12px">
+      <button type="submit" class="btn btn-primary" id="upgrade-btn">Submit request</button>
+      <button type="button" class="btn btn-ghost" onclick="document.getElementById('upgrade-card').style.display='none'">Cancel</button>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const PLAN_FEATURES = {
+  free:    { label:'Free',    price:'₹0/mo',    color:'var(--border)', features:['5 invoices/month','PDF generation','UPI + bank payments','API access'] },
+  starter: { label:'Starter', price:'₹499/mo',  color:'var(--primary)', features:['100 invoices/month','PDF generation','Email delivery','Webhooks','Priority support'] },
+  pro:     { label:'Pro',     price:'₹1,499/mo', color:'#7c3aed', features:['Unlimited invoices','PDF generation','Email delivery','Webhooks','Team members (soon)','Dedicated support'] },
+};
+
+let currentPlan = '';
+let targetPlan  = '';
+
+async function loadBilling() {
+  try {
+    const data = await API.get('/billing/current');
+    currentPlan = data.plan;
+
+    const card = document.getElementById('current-plan-card');
+    const p = PLAN_FEATURES[currentPlan] || PLAN_FEATURES.free;
+    card.innerHTML = `
+      <div style="display:flex;align-items:center;gap:16px">
+        <div style="width:48px;height:48px;border-radius:50%;background:${p.color};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:18px">${currentPlan[0].toUpperCase()}</div>
+        <div>
+          <div style="font-size:18px;font-weight:700">${p.label} Plan</div>
+          <div style="color:var(--text-muted);font-size:14px">${p.price} &mdash; ${data.invoices_per_month < 0 ? 'Unlimited' : data.invoices_per_month} invoices/month</div>
+        </div>
+      </div>`;
+
+    const grid = document.getElementById('plans-grid');
+    grid.innerHTML = Object.entries(PLAN_FEATURES).map(([key, p]) => `
+      <div style="border:2px solid ${key === currentPlan ? p.color : 'var(--border)'};border-radius:var(--radius);padding:20px;background:${key === currentPlan ? '#f0f4ff' : '#fff'}">
+        <div style="font-weight:700;font-size:17px;margin-bottom:4px">${p.label}</div>
+        <div style="font-size:22px;font-weight:800;color:${p.color};margin-bottom:16px">${p.price}</div>
+        <ul style="list-style:none;padding:0;margin:0 0 20px;display:flex;flex-direction:column;gap:6px;font-size:13px">
+          ${p.features.map(f => `<li>&#10003; ${f}</li>`).join('')}
+        </ul>
+        ${key === currentPlan
+          ? `<div style="text-align:center;color:var(--text-muted);font-size:13px;font-weight:600">Current plan</div>`
+          : key === 'free'
+            ? ''
+            : `<button class="btn btn-primary btn-block" onclick="startUpgrade('${key}','${p.label}','${p.price}')">Upgrade to ${p.label}</button>`}
+      </div>`).join('');
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+function startUpgrade(plan, label, price) {
+  targetPlan = plan;
+  document.getElementById('upgrade-title').textContent = `Upgrade to ${label} — ${price}`;
+  document.getElementById('upgrade-card').style.display = '';
+  document.getElementById('upgrade-card').scrollIntoView({ behavior: 'smooth' });
+}
+
+document.getElementById('upgrade-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  hideAlert('upgrade-alert');
+  const btn = document.getElementById('upgrade-btn');
+  btn.disabled = true; btn.textContent = 'Submitting…';
+  try {
+    const res = await API.post('/billing/upgrade-request', {
+      plan: targetPlan,
+      utr:  document.getElementById('utr').value,
+      note: document.getElementById('note').value,
+    });
+    toast(res.message, 'success');
+    document.getElementById('upgrade-card').style.display = 'none';
+    document.getElementById('upgrade-form').reset();
+  } catch (err) { showAlert('upgrade-alert', err.message); }
+  finally { btn.disabled = false; btn.textContent = 'Submit request'; }
+});
+
+loadBilling();
+</script>
+{% endblock %}

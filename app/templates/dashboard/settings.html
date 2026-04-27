@@ -1,0 +1,116 @@
+{% extends "dashboard/base.html" %}
+{% block title %}Settings{% endblock %}
+{% block nav_settings %}active{% endblock %}
+{% block page_title %}Settings{% endblock %}
+
+{% block content %}
+<div style="max-width:640px">
+
+  <div class="card">
+    <div class="card-header"><span class="card-title">Business Profile</span></div>
+    <p style="color:var(--text-muted);font-size:14px;margin-bottom:20px">
+      This information appears on your PDF invoices.
+    </p>
+    <div id="profile-alert" class="alert"></div>
+    <form id="profile-form">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Your name *</label>
+          <input type="text" id="name" required>
+        </div>
+        <div class="form-group">
+          <label>Business name</label>
+          <input type="text" id="business_name" placeholder="Shown on invoices">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>GSTIN</label>
+          <input type="text" id="gstin" placeholder="22AAAAA0000A1Z5" style="text-transform:uppercase">
+        </div>
+        <div class="form-group">
+          <label>Phone</label>
+          <input type="text" id="phone" placeholder="+91 98765 43210">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Business address</label>
+        <textarea id="address" rows="3" placeholder="Street, City, State, PIN"></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary" id="profile-btn">Save Profile</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><span class="card-title">Change Password</span></div>
+    <div id="pw-alert" class="alert"></div>
+    <form id="pw-form">
+      <div class="form-group">
+        <label>New password</label>
+        <input type="password" id="new_password" placeholder="At least 8 characters" minlength="8" required>
+      </div>
+      <div class="form-group">
+        <label>Confirm new password</label>
+        <input type="password" id="confirm_password" placeholder="Repeat password" required>
+      </div>
+      <button type="submit" class="btn btn-primary" id="pw-btn">Update Password</button>
+    </form>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadProfile() {
+  try {
+    const user = await API.get('/auth/me');
+    document.getElementById('name').value         = user.name || '';
+    document.getElementById('business_name').value = user.business_name || '';
+    document.getElementById('gstin').value         = user.gstin || '';
+    document.getElementById('phone').value         = user.phone || '';
+    document.getElementById('address').value       = user.address || '';
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+document.getElementById('profile-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  hideAlert('profile-alert');
+  const btn = document.getElementById('profile-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    const updated = await API.patch('/auth/profile', {
+      name:          document.getElementById('name').value,
+      business_name: document.getElementById('business_name').value || null,
+      gstin:         document.getElementById('gstin').value.toUpperCase() || null,
+      phone:         document.getElementById('phone').value || null,
+      address:       document.getElementById('address').value || null,
+    });
+    localStorage.setItem('user', JSON.stringify(updated));
+    loadSidebarUser();
+    toast('Profile saved!');
+  } catch (err) { showAlert('profile-alert', err.message); }
+  finally { btn.disabled = false; btn.textContent = 'Save Profile'; }
+});
+
+document.getElementById('pw-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  hideAlert('pw-alert');
+  const np = document.getElementById('new_password').value;
+  const cp = document.getElementById('confirm_password').value;
+  if (np !== cp) { showAlert('pw-alert', 'Passwords do not match'); return; }
+  const btn = document.getElementById('pw-btn');
+  btn.disabled = true; btn.textContent = 'Updating…';
+  try {
+    // Generate a one-time reset token via forgot-password, then apply it
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    await API.post('/auth/forgot-password', { email: user.email });
+    showAlert('pw-alert', 'A password reset link has been sent to your email. Use it to change your password.', 'info');
+    document.getElementById('pw-form').reset();
+  } catch (err) { showAlert('pw-alert', err.message); }
+  finally { btn.disabled = false; btn.textContent = 'Update Password'; }
+});
+
+loadProfile();
+</script>
+{% endblock %}

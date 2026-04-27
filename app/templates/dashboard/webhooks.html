@@ -1,0 +1,148 @@
+{% extends "dashboard/base.html" %}
+{% block title %}Webhooks{% endblock %}
+{% block nav_webhooks %}active{% endblock %}
+{% block page_title %}Webhooks{% endblock %}
+
+{% block content %}
+<p style="color:var(--text-muted);margin-bottom:24px;font-size:15px">
+  Register a URL and Invoice API will POST a signed JSON event whenever a payment is confirmed or rejected.
+</p>
+
+<!-- Config card -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Endpoint</span></div>
+  <div id="config-alert" class="alert"></div>
+  <div id="current-config" style="margin-bottom:20px"></div>
+  <form id="config-form">
+    <div class="form-group" style="margin-bottom:12px">
+      <label>Webhook URL</label>
+      <input type="url" id="webhook-url" placeholder="https://yourserver.com/webhooks/invoice" required>
+    </div>
+    <button type="submit" class="btn btn-primary" id="config-btn">Save endpoint</button>
+    <button type="button" class="btn btn-danger" id="delete-btn" style="display:none;margin-left:10px" onclick="deleteWebhook()">Remove</button>
+  </form>
+</div>
+
+<!-- Secret reveal modal -->
+<div class="modal-overlay hidden" id="secret-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="document.getElementById('secret-modal').classList.add('hidden')">×</button>
+    <div class="modal-title">🔐 Webhook Signing Secret</div>
+    <p style="font-size:14px;color:var(--text-muted)">This secret is shown <strong>only once</strong>. Use it to verify incoming webhook signatures.</p>
+    <div class="key-box" id="secret-reveal"></div>
+    <div class="copy-row">
+      <input type="text" id="secret-copy" readonly>
+      <button class="btn btn-primary" onclick="copyText(document.getElementById('secret-copy').value,'Secret copied!')">Copy</button>
+    </div>
+    <p style="font-size:12px;color:var(--text-muted);margin-top:10px">
+      Verify: <code>HMAC-SHA256(request_body, secret) === X-Invoice-Signature header</code>
+    </p>
+    <button class="btn btn-ghost btn-block" style="margin-top:16px" onclick="document.getElementById('secret-modal').classList.add('hidden')">Done</button>
+  </div>
+</div>
+
+<!-- Payload reference -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Event payload</span></div>
+  <pre style="background:var(--bg);padding:16px;border-radius:var(--radius);font-size:13px;overflow-x:auto">{
+  "event": "payment.confirmed",
+  "timestamp": "2026-04-26T10:00:00+00:00",
+  "invoice_id": "uuid",
+  "invoice_number": "INV-2026-0001",
+  "amount": 5900.00,
+  "currency": "INR",
+  "customer_name": "Acme Corp",
+  "utr": "411234567890"
+}</pre>
+  <p style="font-size:13px;color:var(--text-muted);margin-top:8px">
+    Events: <code>payment.confirmed</code>, <code>payment.rejected</code><br>
+    Signature header: <code>X-Invoice-Signature</code> (HMAC-SHA256 hex)
+  </p>
+</div>
+
+<!-- Delivery logs -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Recent deliveries</span></div>
+  <div id="deliveries-list">
+    <div style="text-align:center;padding:24px;color:var(--text-muted)">Loading…</div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadConfig() {
+  try {
+    const cfg = await API.get('/webhooks/config');
+    const el = document.getElementById('current-config');
+    const deleteBtn = document.getElementById('delete-btn');
+    if (cfg.webhook_url) {
+      el.innerHTML = `<div style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--success-light);border-radius:var(--radius)">
+        <span style="color:var(--success);font-size:18px">&#10003;</span>
+        <div>
+          <div style="font-weight:600">${cfg.webhook_url}</div>
+          <div style="font-size:13px;color:var(--text-muted)">Signing secret: <code>${cfg.webhook_secret_hint}</code></div>
+        </div>
+      </div>`;
+      document.getElementById('webhook-url').value = cfg.webhook_url;
+      deleteBtn.style.display = '';
+    } else {
+      el.innerHTML = `<p style="color:var(--text-muted);font-size:14px">No endpoint configured yet.</p>`;
+      deleteBtn.style.display = 'none';
+    }
+  } catch(e) {}
+}
+
+async function loadDeliveries() {
+  try {
+    const rows = await API.get('/webhooks/deliveries');
+    const el = document.getElementById('deliveries-list');
+    if (!rows.length) {
+      el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted)">No deliveries yet.</div>';
+      return;
+    }
+    el.innerHTML = `<div class="table-wrap"><table>
+      <thead><tr><th>Event</th><th>Status</th><th>HTTP</th><th>Time</th><th>Error</th></tr></thead>
+      <tbody>${rows.map(r => `
+        <tr>
+          <td><code style="font-size:12px">${r.event}</code></td>
+          <td>${r.status === 'delivered'
+            ? '<span class="badge badge-green">delivered</span>'
+            : '<span class="badge badge-red">failed</span>'}</td>
+          <td>${r.response_code || '—'}</td>
+          <td>${fmtDate(r.created_at)}</td>
+          <td style="font-size:12px;color:var(--danger)">${r.error || ''}</td>
+        </tr>`).join('')}
+      </tbody></table></div>`;
+  } catch(e) {}
+}
+
+document.getElementById('config-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  hideAlert('config-alert');
+  const btn = document.getElementById('config-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    const res = await API.post('/webhooks/config', { url: document.getElementById('webhook-url').value });
+    document.getElementById('secret-reveal').textContent = res.webhook_secret;
+    document.getElementById('secret-copy').value = res.webhook_secret;
+    document.getElementById('secret-modal').classList.remove('hidden');
+    loadConfig();
+  } catch(err) { showAlert('config-alert', err.message); }
+  finally { btn.disabled = false; btn.textContent = 'Save endpoint'; }
+});
+
+async function deleteWebhook() {
+  if (!confirm('Remove this webhook endpoint?')) return;
+  try {
+    await API.del('/webhooks/config');
+    toast('Webhook removed.');
+    loadConfig();
+    loadDeliveries();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+loadConfig();
+loadDeliveries();
+</script>
+{% endblock %}

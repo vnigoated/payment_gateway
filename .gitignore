@@ -1,0 +1,101 @@
+# ── Secrets ───────────────────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+ENV/
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+*.egg
+.eggs/
+wheels/
+
+# Testing
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.lcov
+
+# Type checking & linting
+.mypy_cache/
+.ruff_cache/
+.dmypy.json
+
+# ── Alembic ───────────────────────────────────────────────────────────────────
+# Keep migration files — they are source code
+# Only ignore the compiled cache inside versions
+alembic/versions/__pycache__/
+
+# ── Celery ────────────────────────────────────────────────────────────────────
+celerybeat-schedule
+celerybeat.pid
+
+# ── Database ──────────────────────────────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+logs/
+log/
+
+# ── Generated files ───────────────────────────────────────────────────────────
+# PDFs generated at runtime (if saved to disk instead of returned in-memory)
+generated/
+tmp/
+temp/
+
+# ── Frontend (static assets) ──────────────────────────────────────────────────
+# No Node/npm build step in this project, but guard against accidental installs
+node_modules/
+.npm/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Compiled/minified output (if a build step is added later)
+app/static/dist/
+app/static/build/
+*.min.js.map
+*.min.css.map
+
+# ── IDEs ──────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ── Misc ──────────────────────────────────────────────────────────────────────
+*.bak
+*.orig
+.cache/

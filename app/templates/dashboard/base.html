@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{% block title %}Dashboard{% endblock %} — Invoice API</title>
+  <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body class="dashboard-body">
+<div class="dashboard-layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <span class="logo-icon">⚡</span>
+      <span class="logo-text">Invoice API</span>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="/dashboard"                  class="nav-item {% block nav_home %}{% endblock %}"><span class="nav-icon">⊞</span> Dashboard</a>
+      <a href="/dashboard/invoices"         class="nav-item {% block nav_invoices %}{% endblock %}"><span class="nav-icon">🧾</span> Invoices</a>
+      <a href="/dashboard/keys"             class="nav-item {% block nav_keys %}{% endblock %}"><span class="nav-icon">🔑</span> API Keys</a>
+      <a href="/dashboard/payment-methods"  class="nav-item {% block nav_pm %}{% endblock %}"><span class="nav-icon">💳</span> Payment Methods</a>
+      <a href="/dashboard/webhooks"         class="nav-item {% block nav_webhooks %}{% endblock %}"><span class="nav-icon">🔗</span> Webhooks</a>
+      <div style="margin:12px 16px 4px;font-size:10px;font-weight:700;text-transform:uppercase;color:#475569;letter-spacing:.08em">Account</div>
+      <a href="/dashboard/billing"          class="nav-item {% block nav_billing %}{% endblock %}"><span class="nav-icon">💰</span> Billing</a>
+      <a href="/dashboard/settings"         class="nav-item {% block nav_settings %}{% endblock %}"><span class="nav-icon">⚙</span> Settings</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar" id="sidebar-avatar">U</div>
+        <div>
+          <div class="user-name" id="sidebar-user-name">Loading…</div>
+          <div class="user-plan" id="sidebar-user-plan">free plan</div>
+        </div>
+      </div>
+      <button class="logout-btn" onclick="logout()">← Logout</button>
+    </div>
+  </aside>
+
+  <main class="dashboard-main">
+    <div class="topbar">
+      <h1 class="page-title">{% block page_title %}Dashboard{% endblock %}</h1>
+      <div class="topbar-actions">{% block topbar_actions %}{% endblock %}</div>
+    </div>
+    <div class="page-content">
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+</div>
+
+<script src="/static/js/api.js"></script>
+<script>
+  requireAuth();
+  loadSidebarUser();
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>
