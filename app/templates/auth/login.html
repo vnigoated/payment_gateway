@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Login — Invoice API</title>
+  <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body class="auth-body">
+<div class="auth-wrap">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <div class="auth-logo-icon">⚡</div>
+      <div class="auth-logo-name">Invoice API</div>
+    </div>
+    <h1 class="auth-title">Welcome back</h1>
+    <p class="auth-sub">Login to your dashboard</p>
+
+    <div id="alert" class="alert alert-error"></div>
+
+    <form id="login-form">
+      <div class="form-group">
+        <label for="email">Email address</label>
+        <input type="email" id="email" placeholder="you@example.com" required>
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" placeholder="Your password" required>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block" id="submit-btn">Login</button>
+    </form>
+
+    <div class="auth-footer" style="display:flex;justify-content:space-between">
+      <a href="/forgot-password">Forgot password?</a>
+      <a href="/signup">Sign up free</a>
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/api.js"></script>
+<script>
+  if (localStorage.getItem('token')) window.location.href = '/dashboard';
+
+  document.getElementById('login-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    hideAlert('alert');
+    const btn = document.getElementById('submit-btn');
+    btn.disabled = true; btn.textContent = 'Logging in…';
+
+    try {
+      const data = await API.post('/auth/login', {
+        email: document.getElementById('email').value,
+        password: document.getElementById('password').value,
+      });
+      localStorage.setItem('token', data.access_token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      window.location.href = '/dashboard';
+    } catch (err) {
+      showAlert('alert', err.message);
+      btn.disabled = false; btn.textContent = 'Login';
+    }
+  });
+</script>
+</body>
+</html>

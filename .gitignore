@@ -1,39 +1,117 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# ── Secrets ───────────────────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+.env*.local
+.env.development.local
+.env.test.local
+.env.production.local
 
-# dependencies
-/node_modules
+# ── Next.js / Node ────────────────────────────────────────────────────────────
+node_modules/
 /.pnp
 .pnp.js
+/.next/
+/out/
+/build
+.vercel
+*.tsbuildinfo
+next-env.d.ts
 
 # testing
 /coverage
-
-# next.js
-/.next/
-/out/
-
-# production
-/build
-
-# misc
-.DS_Store
-*.pem
 
 # debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# local env files
-.env*.local
-.env
-.env.development.local
-.env.test.local
-.env.production.local
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
 
-# vercel
-.vercel
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+ENV/
 
-# typescript
-*.tsbuildinfo
-next-env.d.ts
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+*.egg
+.eggs/
+wheels/
+
+# Testing
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.lcov
+
+# Type checking & linting
+.mypy_cache/
+.ruff_cache/
+.dmypy.json
+
+# ── Alembic ───────────────────────────────────────────────────────────────────
+# Keep migration files — they are source code
+# Only ignore the compiled cache inside versions
+alembic/versions/__pycache__/
+
+# ── Celery ────────────────────────────────────────────────────────────────────
+celerybeat-schedule
+celerybeat.pid
+
+# ── Database ──────────────────────────────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+logs/
+log/
+
+# ── Generated files ───────────────────────────────────────────────────────────
+# PDFs generated at runtime (if saved to disk instead of returned in-memory)
+generated/
+tmp/
+temp/
+
+# Compiled/minified output (if a build step is added later)
+app/static/dist/
+app/static/build/
+*.min.js.map
+*.min.css.map
+
+# ── IDEs ──────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ── Misc ──────────────────────────────────────────────────────────────────────
+*.bak
+*.orig
+.cache/
+*.pem
