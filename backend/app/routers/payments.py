@@ -4,9 +4,8 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 import qrcode
-from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
-from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, status, BackgroundTasks
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -21,17 +20,16 @@ from app.utils.cache import invalidate_invoice_cache
 from app.utils.security import get_current_user, get_user_jwt_or_key
 from pathlib import Path
 
-templates = Jinja2Templates(directory=str(Path(__file__).parent.parent / "templates"))
 router = APIRouter(tags=["Payments"])
 
 
 # ── Public: customer-facing payment page ──────────────────────────────────────
 
-@router.get("/pay/{invoice_id}", response_class=HTMLResponse)
-def payment_page(invoice_id: UUID, request: Request, db: Session = Depends(get_db)):
+@router.get("/pay/{invoice_id}/public")
+def public_payment_details(invoice_id: UUID, db: Session = Depends(get_db)):
     invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
     if not invoice:
-        return HTMLResponse("<h2>Invoice not found</h2>", status_code=404)
+        raise HTTPException(status_code=404, detail="Invoice not found")
 
     merchant = db.query(User).filter(User.id == invoice.user_id).first()
 
@@ -66,33 +64,36 @@ def payment_page(invoice_id: UUID, request: Request, db: Session = Depends(get_d
         img.save(buf, format="PNG")
         qr_b64 = base64.b64encode(buf.getvalue()).decode()
 
-    return templates.TemplateResponse("payment_page.html", {
-        "request": request,
-        "invoice": invoice,
+    return {
+        "invoice": Invoice.model_validate(invoice).model_dump(mode="json") if hasattr(Invoice, "model_validate") else invoice,
         "merchant_name": merchant.business_name or merchant.name,
         "upi_method": upi_method,
         "bank_method": bank_method,
         "payment": payment,
         "qr_b64": qr_b64,
-    })
+    }
+
+class SubmitPaymentRequest(BaseModel):
+    utr: str
+    customer_note: str | None = None
 
 
 @router.post("/pay/{invoice_id}/submit")
 def submit_payment_proof(
     invoice_id: UUID,
-    utr: str = Form(...),
-    customer_note: str = Form(None),
+    payload: SubmitPaymentRequest,
     db: Session = Depends(get_db),
 ):
+    import re
     invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
     if invoice.status in ("paid", "cancelled"):
         raise HTTPException(status_code=400, detail=f"Invoice is {invoice.status}")
 
-    utr = utr.strip()
-    if len(utr) < 6:
-        raise HTTPException(status_code=400, detail="UTR number looks too short")
+    utr = payload.utr.strip()
+    if not re.match(r"^[A-Za-z0-9]{6,22}$", utr):
+        raise HTTPException(status_code=400, detail="Invalid UTR format. Should be 6-22 alphanumeric characters.")
     if db.query(Payment).filter(Payment.utr == utr).first():
         raise HTTPException(status_code=400, detail="This UTR has already been submitted")
 
@@ -101,19 +102,50 @@ def submit_payment_proof(
         amount=invoice.total,
         currency=invoice.currency,
         utr=utr,
-        customer_note=customer_note,
+        customer_note=payload.customer_note,
         status="submitted",
     ))
     invoice.status = "pending"
     db.commit()
-    return RedirectResponse(url=f"/pay/{invoice_id}", status_code=303)
+    return {"message": "Payment proof submitted successfully"}
 
 
 # ── Merchant: send invoice ─────────────────────────────────────────────────────
 
+def _send_invoice_email_task(invoice_id, user_id):
+    from app.database import SessionLocal
+    from app.config import settings
+    db = SessionLocal()
+    try:
+        invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+        user = db.query(User).filter(User.id == user_id).first()
+        if not invoice or not user or not invoice.customer_email:
+            return
+        payment_url = f"{settings.APP_URL}/pay/{invoice.id}"
+        from app.utils.pdf import generate_invoice_pdf
+        try:
+            pdf = generate_invoice_pdf(invoice, user)
+        except Exception:
+            pdf = None
+        try:
+            EmailService.send_invoice(
+                to_email=invoice.customer_email,
+                customer_name=invoice.customer_name,
+                invoice_number=invoice.invoice_number,
+                merchant_name=user.business_name or user.name,
+                pdf_bytes=pdf,
+                payment_link=payment_url,
+            )
+        except Exception as e:
+            print(f"Failed to send invoice email: {e}")
+    finally:
+        db.close()
+
+
 @router.post("/invoices/{invoice_id}/send", response_model=dict)
 def send_invoice(
     invoice_id: UUID,
+    background_tasks: BackgroundTasks,
     auth=Depends(get_user_jwt_or_key),
     db: Session = Depends(get_db),
 ):
@@ -131,24 +163,8 @@ def send_invoice(
 
     payment_url = f"{settings.APP_URL}/pay/{invoice.id}"
 
-    # Email customer the invoice + payment link (non-blocking)
     if invoice.customer_email:
-        try:
-            from app.utils.pdf import generate_invoice_pdf
-            pdf = generate_invoice_pdf(invoice, user)
-        except Exception:
-            pdf = None
-        try:
-            EmailService.send_invoice(
-                to_email=invoice.customer_email,
-                customer_name=invoice.customer_name,
-                invoice_number=invoice.invoice_number,
-                merchant_name=user.business_name or user.name,
-                pdf_bytes=pdf,
-                payment_link=payment_url,
-            )
-        except Exception:
-            pass
+        background_tasks.add_task(_send_invoice_email_task, invoice.id, user.id)
 
     return {
         "invoice_id": str(invoice.id),
@@ -162,9 +178,46 @@ def send_invoice(
 
 # ── Merchant: confirm / reject payment ────────────────────────────────────────
 
+def _send_payment_confirmation_task(invoice_id, user_id, utr):
+    from app.database import SessionLocal
+    db = SessionLocal()
+    try:
+        invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+        user = db.query(User).filter(User.id == user_id).first()
+        if not invoice or not user:
+            return
+        
+        if invoice.customer_email:
+            try:
+                EmailService.send_payment_confirmation(
+                    to_email=invoice.customer_email,
+                    customer_name=invoice.customer_name,
+                    invoice_number=invoice.invoice_number,
+                    amount=invoice.total,
+                    merchant_name=user.business_name or user.name,
+                )
+            except Exception as e:
+                print(f"Failed to send payment confirmation email: {e}")
+        
+        try:
+            fire_webhook(db, user, "payment.confirmed", {
+                "invoice_id": str(invoice.id),
+                "invoice_number": invoice.invoice_number,
+                "amount": invoice.total,
+                "currency": invoice.currency,
+                "customer_name": invoice.customer_name,
+                "utr": utr,
+            })
+        except Exception as e:
+            print(f"Failed to fire webhook: {e}")
+    finally:
+        db.close()
+
+
 @router.post("/invoices/{invoice_id}/confirm-payment", response_model=PaymentOut)
 def confirm_payment(
     invoice_id: UUID,
+    background_tasks: BackgroundTasks,
     auth=Depends(get_user_jwt_or_key),
     db: Session = Depends(get_db),
 ):
@@ -178,39 +231,43 @@ def confirm_payment(
     db.refresh(payment)
     invalidate_invoice_cache(str(user.id))
 
-    # Email receipt to customer (non-blocking)
-    if invoice.customer_email:
-        try:
-            EmailService.send_payment_confirmation(
-                to_email=invoice.customer_email,
-                customer_name=invoice.customer_name,
-                invoice_number=invoice.invoice_number,
-                amount=invoice.total,
-                merchant_name=user.business_name or user.name,
-            )
-        except Exception:
-            pass
-
-    # Fire webhook (non-blocking)
-    try:
-        fire_webhook(db, user, "payment.confirmed", {
-            "invoice_id": str(invoice.id),
-            "invoice_number": invoice.invoice_number,
-            "amount": invoice.total,
-            "currency": invoice.currency,
-            "customer_name": invoice.customer_name,
-            "utr": payment.utr,
-        })
-    except Exception:
-        pass
+    background_tasks.add_task(_send_payment_confirmation_task, invoice.id, user.id, payment.utr)
 
     return payment
 
 
+def _send_payment_rejected_task(invoice_id, user_id, utr, reason):
+    from app.database import SessionLocal
+    db = SessionLocal()
+    try:
+        invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+        user = db.query(User).filter(User.id == user_id).first()
+        if not invoice or not user:
+            return
+        
+        try:
+            fire_webhook(db, user, "payment.rejected", {
+                "invoice_id": str(invoice.id),
+                "invoice_number": invoice.invoice_number,
+                "amount": invoice.total,
+                "currency": invoice.currency,
+                "customer_name": invoice.customer_name,
+                "utr": utr,
+                "reason": reason,
+            })
+        except Exception as e:
+            print(f"Failed to fire webhook: {e}")
+    finally:
+        db.close()
+
+class RejectPaymentRequest(BaseModel):
+    reason: str = "Payment could not be verified"
+
 @router.post("/invoices/{invoice_id}/reject-payment", response_model=PaymentOut)
 def reject_payment(
     invoice_id: UUID,
-    reason: str = "Payment could not be verified",
+    payload: RejectPaymentRequest,
+    background_tasks: BackgroundTasks,
     auth=Depends(get_user_jwt_or_key),
     db: Session = Depends(get_db),
 ):
@@ -218,25 +275,23 @@ def reject_payment(
     invoice, payment = _get_invoice_and_pending_payment(db, invoice_id, user.id)
 
     payment.status = "rejected"
-    payment.rejection_reason = reason
-    invoice.status = "sent"
+    payment.rejection_reason = payload.reason
+    
+    # Check if there are other pending payments before reverting invoice status to sent
+    other_pending = db.query(Payment).filter(
+        Payment.invoice_id == invoice.id,
+        Payment.status == "submitted",
+        Payment.id != payment.id
+    ).first()
+    
+    if not other_pending:
+        invoice.status = "sent"
+
     db.commit()
     db.refresh(payment)
     invalidate_invoice_cache(str(user.id))
 
-    # Fire webhook (non-blocking)
-    try:
-        fire_webhook(db, user, "payment.rejected", {
-            "invoice_id": str(invoice.id),
-            "invoice_number": invoice.invoice_number,
-            "amount": invoice.total,
-            "currency": invoice.currency,
-            "customer_name": invoice.customer_name,
-            "utr": payment.utr,
-            "reason": reason,
-        })
-    except Exception:
-        pass
+    background_tasks.add_task(_send_payment_rejected_task, invoice.id, user.id, payment.utr, payload.reason)
 
     return payment
 

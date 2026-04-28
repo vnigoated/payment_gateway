@@ -6,6 +6,7 @@ from app.models.api_key import APIKey
 from app.models.invoice import Invoice
 from app.models.user import User
 from app.schemas.invoice import InvoiceCreate, InvoiceUpdate
+from app.utils.cache import invalidate_invoice_cache
 
 
 class InvoiceService:
@@ -70,6 +71,7 @@ class InvoiceService:
         user.invoice_count_this_month += 1
         db.commit()
         db.refresh(invoice)
+        invalidate_invoice_cache(str(user.id))
         return invoice
 
     @staticmethod
@@ -92,4 +94,14 @@ class InvoiceService:
 
         db.commit()
         db.refresh(invoice)
+        invalidate_invoice_cache(str(invoice.user_id))
         return invoice
+
+    @staticmethod
+    def cancel(db: Session, invoice: Invoice) -> None:
+        from fastapi import HTTPException
+        if invoice.status == "paid":
+            raise HTTPException(status_code=400, detail="Cannot cancel a paid invoice")
+        invoice.status = "cancelled"
+        db.commit()
+        invalidate_invoice_cache(str(invoice.user_id))

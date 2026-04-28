@@ -8,7 +8,7 @@ from app.database import get_db
 from app.models.invoice import Invoice
 from app.schemas.invoice import InvoiceCreate, InvoiceOut, InvoiceUpdate
 from app.services.invoice_service import InvoiceService
-from app.utils.cache import get_cached_invoices, invalidate_invoice_cache, set_cached_invoices
+from app.utils.cache import get_cached_invoices, set_cached_invoices
 from app.utils.security import get_user_jwt_or_key
 
 router = APIRouter(prefix="/invoices", tags=["Invoices"])
@@ -29,7 +29,6 @@ def create_invoice(
 ):
     user, api_key, db = deps
     invoice = InvoiceService.create(db, user, api_key, payload)
-    invalidate_invoice_cache(str(user.id))
     return invoice
 
 
@@ -82,7 +81,6 @@ def update_invoice(invoice_id: UUID, payload: InvoiceUpdate, deps=Depends(_get_u
     if invoice.status not in ("draft",):
         raise HTTPException(status_code=400, detail="Only draft invoices can be edited")
     updated = InvoiceService.update(db, invoice, payload)
-    invalidate_invoice_cache(str(user.id))
     return updated
 
 
@@ -111,8 +109,4 @@ def cancel_invoice(invoice_id: UUID, deps=Depends(_get_user_and_key)):
     ).first()
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
-    if invoice.status == "paid":
-        raise HTTPException(status_code=400, detail="Cannot cancel a paid invoice")
-    invoice.status = "cancelled"
-    db.commit()
-    invalidate_invoice_cache(str(user.id))
+    InvoiceService.cancel(db, invoice)
