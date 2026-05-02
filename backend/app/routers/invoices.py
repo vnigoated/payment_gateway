@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, File, UploadFile
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy.orm import Session
 
@@ -12,6 +12,8 @@ from app.utils.cache import get_cached_invoices, set_cached_invoices
 from app.utils.security import get_user_jwt_or_key
 
 router = APIRouter(prefix="/invoices", tags=["Invoices"])
+
+from app.services.ai_service import AIService
 
 
 def _get_user_and_key(
@@ -30,6 +32,28 @@ def create_invoice(
     user, api_key, db = deps
     invoice = InvoiceService.create(db, user, api_key, payload)
     return invoice
+
+
+@router.post("/scan")
+async def scan_invoice(
+    file: UploadFile = File(...),
+    deps=Depends(_get_user_and_key),
+):
+    """
+    Upload an invoice image or PDF and extract data using AI.
+    """
+    user, api_key, db = deps
+
+    content = await file.read()
+    mime_type = file.content_type or ""
+
+    if not content:
+        raise HTTPException(status_code=400, detail="The uploaded file is empty")
+
+    if not mime_type.startswith("image/") and mime_type != "application/pdf":
+        raise HTTPException(status_code=400, detail="Only images and PDFs are supported")
+
+    return AIService.extract_invoice_data(content, mime_type)
 
 
 @router.get("", response_model=list[InvoiceOut])

@@ -1,4 +1,4 @@
-import type { User, APIKey, APIKeyCreated, Invoice, Payment, PaymentMethod } from './types'
+import type { User, APIKey, APIKeyCreated, Invoice, InvoiceScanResult, Payment, PaymentMethod } from './types'
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -15,13 +15,20 @@ function activeKey() {
 async function req<T>(
   path: string,
   opts: RequestInit = {},
-  auth: 'jwt' | 'apikey' | 'none' = 'jwt',
+  auth: 'jwt' | 'apikey' | 'dashboard' | 'none' = 'jwt',
 ): Promise<T> {
-  const token = auth === 'apikey' ? activeKey() : auth === 'jwt' ? jwt() : null
+  const token =
+    auth === 'apikey'
+      ? activeKey()
+      : auth === 'dashboard'
+        ? jwt() ?? activeKey()
+        : auth === 'jwt'
+          ? jwt()
+          : null
   const res = await fetch(`${BASE}${path}`, {
     ...opts,
     headers: {
-      'Content-Type': 'application/json',
+      ...(opts.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(opts.headers ?? {}),
     },
@@ -55,29 +62,35 @@ export const api = {
   // ── Invoices ────────────────────────────────────────────────────────────────
 
   createInvoice: (data: object) =>
-    req<Invoice>('/invoices', { method: 'POST', body: JSON.stringify(data) }, 'apikey'),
+    req<Invoice>('/invoices', { method: 'POST', body: JSON.stringify(data) }, 'dashboard'),
 
   listInvoices: (status?: string) =>
-    req<Invoice[]>(`/invoices${status ? `?status=${status}` : ''}`, {}, 'apikey'),
+    req<Invoice[]>(`/invoices${status ? `?status=${status}` : ''}`, {}, 'dashboard'),
 
-  getInvoice: (id: string) => req<Invoice>(`/invoices/${id}`, {}, 'apikey'),
+  getInvoice: (id: string) => req<Invoice>(`/invoices/${id}`, {}, 'dashboard'),
 
   cancelInvoice: (id: string) =>
-    req<null>(`/invoices/${id}`, { method: 'DELETE' }, 'apikey'),
+    req<null>(`/invoices/${id}`, { method: 'DELETE' }, 'dashboard'),
 
   sendInvoice: (id: string) =>
-    req<{ payment_url: string; invoice_number: string }>(`/invoices/${id}/send`, { method: 'POST' }, 'apikey'),
+    req<{ payment_url: string; invoice_number: string }>(`/invoices/${id}/send`, { method: 'POST' }, 'dashboard'),
+
+  scanInvoice: (file: File) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    return req<InvoiceScanResult>('/invoices/scan', { method: 'POST', body: fd }, 'dashboard')
+  },
 
   // ── Payments ────────────────────────────────────────────────────────────────
 
   listPayments: (invoiceId: string) =>
-    req<Payment[]>(`/invoices/${invoiceId}/payments`, {}, 'apikey'),
+    req<Payment[]>(`/invoices/${invoiceId}/payments`, {}, 'dashboard'),
 
   confirmPayment: (invoiceId: string) =>
-    req<Payment>(`/invoices/${invoiceId}/confirm-payment`, { method: 'POST' }, 'apikey'),
+    req<Payment>(`/invoices/${invoiceId}/confirm-payment`, { method: 'POST' }, 'dashboard'),
 
   rejectPayment: (invoiceId: string, reason: string) =>
-    req<Payment>(`/invoices/${invoiceId}/reject-payment?reason=${encodeURIComponent(reason)}`, { method: 'POST' }, 'apikey'),
+    req<Payment>(`/invoices/${invoiceId}/reject-payment?reason=${encodeURIComponent(reason)}`, { method: 'POST' }, 'dashboard'),
 
   // ── Payment Methods ─────────────────────────────────────────────────────────
 

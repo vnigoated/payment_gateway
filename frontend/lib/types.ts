@@ -85,3 +85,22 @@ export interface PaymentMethod {
   is_active: boolean
   created_at: string
 }
+
+export interface InvoiceScanResult {
+  customer_name: string | null
+  customer_email: string | null
+  customer_phone: string | null
+  customer_address: string | null
+  customer_gstin: string | null
+  line_items: Array<{
+    name: string
+    quantity: number
+    rate: number
+  }>
+  gst_rate: number
+  discount: number
+  currency: string | null
+  invoice_date: string | null
+  due_date: string | null
+  notes: string | null
+}

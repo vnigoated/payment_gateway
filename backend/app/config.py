@@ -21,6 +21,10 @@ class Settings(BaseSettings):
 
     # Plan limits (invoices per month)
     FREE_INVOICE_LIMIT: int = 5
+    GROQ_API_KEY: str = ""
+    AI_SCAN_MODEL: str = "llama-3.2-11b-vision-preview"
+    GEMINI_API_KEY: str = ""
+    GEMINI_AI_SCAN_MODEL: str = "gemini-2.5-flash"
 
     class Config:
         env_file = ".env"
