@@ -55,6 +55,8 @@ class InvoiceService:
             customer_phone=payload.customer_phone,
             customer_address=payload.customer_address,
             customer_gstin=payload.customer_gstin,
+            external_reference_id=payload.external_reference_id,
+            gateway_metadata=payload.gateway_metadata,
             line_items=line_items,
             subtotal=subtotal,
             gst_rate=payload.gst_rate,

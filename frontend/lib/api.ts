@@ -1,4 +1,4 @@
-import type { User, APIKey, APIKeyCreated, Invoice, InvoiceScanResult, Payment, PaymentMethod } from './types'
+import type { User, APIKey, APIKeyCreated, Invoice, InvoiceScanResult, Payment, PaymentMethod, CheckoutSession } from './types'
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -64,6 +64,9 @@ export const api = {
 
   createInvoice: (data: object) =>
     req<Invoice>('/invoices', { method: 'POST', body: JSON.stringify(data) }, 'dashboard'),
+
+  createCheckout: (data: object) =>
+    req<CheckoutSession>('/checkout/create', { method: 'POST', body: JSON.stringify(data) }, 'apikey'),
 
   listInvoices: (status?: string) =>
     req<Invoice[]>(`/invoices${status ? `?status=${status}` : ''}`, {}, 'dashboard'),

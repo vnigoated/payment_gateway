@@ -13,14 +13,46 @@ from app.models.invoice import Invoice
 from app.models.payment import Payment
 from app.models.payment_method import PaymentMethod
 from app.models.user import User
+from app.schemas.invoice import InvoiceCreate
+from app.schemas.invoice import CheckoutSessionOut
 from app.schemas.payment_method import PaymentOut
 from app.services.email_service import EmailService
+from app.services.invoice_service import InvoiceService
 from app.services.webhook_service import fire_webhook
 from app.utils.cache import invalidate_invoice_cache
 from app.utils.security import get_current_user, get_user_jwt_or_key
 from pathlib import Path
 
 router = APIRouter(tags=["Payments"])
+
+
+def _merchant_display_name(user: User) -> str:
+    return user.business_name or user.name
+
+
+def _get_default_upi_method(db: Session, user_id):
+    return (
+        db.query(PaymentMethod)
+        .filter(
+            PaymentMethod.user_id == user_id,
+            PaymentMethod.method_type == "upi",
+            PaymentMethod.is_active == True,
+        )
+        .order_by(PaymentMethod.is_default.desc())
+        .first()
+    )
+
+
+def _build_upi_qr_b64(upi_method: PaymentMethod, payee_name: str, amount: float, invoice_number: str) -> str:
+    upi_uri = (
+        f"upi://pay?pa={upi_method.upi_id}"
+        f"&pn={upi_method.upi_name or payee_name}"
+        f"&am={amount:.2f}&cu=INR&tn={invoice_number}"
+    )
+    img = qrcode.make(upi_uri)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return base64.b64encode(buf.getvalue()).decode()
 
 
 # ── Public: customer-facing payment page ──────────────────────────────────────
@@ -33,12 +65,7 @@ def public_payment_details(invoice_id: UUID, db: Session = Depends(get_db)):
 
     merchant = db.query(User).filter(User.id == invoice.user_id).first()
 
-    upi_method = (
-        db.query(PaymentMethod)
-        .filter(PaymentMethod.user_id == invoice.user_id, PaymentMethod.method_type == "upi", PaymentMethod.is_active == True)
-        .order_by(PaymentMethod.is_default.desc())
-        .first()
-    )
+    upi_method = _get_default_upi_method(db, invoice.user_id)
     bank_method = (
         db.query(PaymentMethod)
         .filter(PaymentMethod.user_id == invoice.user_id, PaymentMethod.method_type == "bank", PaymentMethod.is_active == True)
@@ -54,15 +81,7 @@ def public_payment_details(invoice_id: UUID, db: Session = Depends(get_db)):
 
     qr_b64 = ""
     if upi_method:
-        upi_uri = (
-            f"upi://pay?pa={upi_method.upi_id}"
-            f"&pn={upi_method.upi_name or merchant.business_name or merchant.name}"
-            f"&am={invoice.total:.2f}&cu=INR&tn={invoice.invoice_number}"
-        )
-        img = qrcode.make(upi_uri)
-        buf = io.BytesIO()
-        img.save(buf, format="PNG")
-        qr_b64 = base64.b64encode(buf.getvalue()).decode()
+        qr_b64 = _build_upi_qr_b64(upi_method, _merchant_display_name(merchant), invoice.total, invoice.invoice_number)
 
     return {
         "invoice": Invoice.model_validate(invoice).model_dump(mode="json") if hasattr(Invoice, "model_validate") else invoice,
@@ -122,6 +141,10 @@ def _send_invoice_email_task(invoice_id, user_id):
         if not invoice or not user or not invoice.customer_email:
             return
         payment_url = f"{settings.APP_URL}/pay/{invoice.id}"
+        upi_method = _get_default_upi_method(db, user.id)
+        qr_b64 = ""
+        if upi_method:
+            qr_b64 = _build_upi_qr_b64(upi_method, _merchant_display_name(user), invoice.total, invoice.invoice_number)
         from app.utils.pdf import generate_invoice_pdf
         try:
             pdf = generate_invoice_pdf(invoice, user)
@@ -135,6 +158,7 @@ def _send_invoice_email_task(invoice_id, user_id):
                 merchant_name=user.business_name or user.name,
                 pdf_bytes=pdf,
                 payment_link=payment_url,
+                qr_b64=qr_b64 or None,
             )
         except Exception as e:
             print(f"Failed to send invoice email: {e}")
@@ -173,6 +197,47 @@ def send_invoice(
         "amount": invoice.total,
         "currency": invoice.currency,
         "status": invoice.status,
+    }
+
+
+@router.post("/checkout/create", response_model=CheckoutSessionOut)
+def create_checkout_session(
+    payload: InvoiceCreate,
+    background_tasks: BackgroundTasks,
+    auth=Depends(get_user_jwt_or_key),
+    db: Session = Depends(get_db),
+):
+    from app.config import settings
+
+    user, api_key = auth
+    upi_method = _get_default_upi_method(db, user.id)
+    if not upi_method:
+        raise HTTPException(
+            status_code=400,
+            detail="Configure an active UPI payment method before creating checkout sessions",
+        )
+
+    invoice = InvoiceService.create(db, user, api_key, payload)
+    invoice.status = "sent"
+    invoice.payment_link = f"{settings.APP_URL}/pay/{invoice.id}"
+    db.commit()
+    db.refresh(invoice)
+    invalidate_invoice_cache(str(user.id))
+
+    qr_b64 = _build_upi_qr_b64(upi_method, _merchant_display_name(user), invoice.total, invoice.invoice_number)
+
+    if invoice.customer_email:
+        background_tasks.add_task(_send_invoice_email_task, invoice.id, user.id)
+
+    return {
+        "invoice_id": str(invoice.id),
+        "invoice_number": invoice.invoice_number,
+        "payment_url": invoice.payment_link,
+        "qr_b64": qr_b64,
+        "amount": invoice.total,
+        "currency": invoice.currency,
+        "status": invoice.status,
+        "external_reference_id": invoice.external_reference_id,
     }
 
 

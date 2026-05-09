@@ -39,12 +39,29 @@ Important:
 ## Main user flow
 
 1. Sign up or log in
-2. Add payment methods
-3. Create an invoice
-4. Send the invoice to the customer
-5. Customer opens the payment page and submits UTR/payment proof
-6. Merchant confirms or rejects the payment
-7. The invoice moves to `paid` or back to `sent`
+2. Complete the onboarding screen with your UPI ID and optional bank details
+3. Add more UPI and bank payment methods later if needed
+4. Create an invoice
+5. Send the invoice to the customer
+6. Customer opens the payment page, scans the QR code, and pays
+7. Customer submits UTR/payment proof
+8. Merchant confirms or rejects the payment
+9. The invoice moves to `paid` or back to `sent`
+
+## SaaS model
+
+This project is designed to be deployed as a SaaS platform.
+
+Your customers are merchants or product owners who sign up on your site, add their bank name and UPI ID, and get a unique QR-backed checkout identity.
+
+Their own website can then call your API when a user clicks `Proceed to Pay`.
+
+The customer receives:
+- a hosted payment page
+- an email with the merchant's QR code
+- bank transfer details if configured
+
+After payment is confirmed, the merchant's backend can unlock the paid product, course, subscription, file, or service.
 
 ## Project structure
 
@@ -139,6 +156,7 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 
 ### Invoices
 
+- `POST /checkout/create`
 - `POST /invoices`
 - `GET /invoices`
 - `GET /invoices/{id}`
@@ -168,6 +186,18 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 - `GET /billing/current`
 - `POST /billing/upgrade-request`
 
+## Developer integration pattern
+
+When your SaaS customer wants to collect payment:
+
+1. Their product calls your API when a user clicks `Proceed to Pay`
+2. You call `POST /checkout/create` with their API key
+3. The gateway creates the invoice, links it to the merchant's external order ID, and sends the payment email
+4. The customer sees the hosted payment page and QR code generated from the merchant's configured UPI ID
+5. The customer pays and submits proof
+6. Your webhook receives `payment.confirmed`
+7. Your app grants access to the paid content
+
 ## Verification
 
 Run the backend payment-flow tests:
@@ -193,4 +223,3 @@ Both should pass before shipping changes.
 - The public payment page shows UPI QR code and bank details from the merchant's configured payment methods
 - Bank transfer fields use `account_holder`, `account_number`, and `ifsc_code`
 - SQLite support is now handled more safely in the backend so local tests and dev runs are easier
-

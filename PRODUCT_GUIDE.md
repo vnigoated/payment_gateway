@@ -1,140 +1,173 @@
-# Invoice & Payment Gateway — Simple Guide
+# Invoice & Payment Gateway
 
-> Send professional GST invoices. Collect UPI and bank transfer payments. Track everything in one place. No Razorpay or Stripe needed.
+> Send professional GST invoices. Collect UPI and bank transfer payments. Unlock paid content from your own app after payment confirmation.
 
----
+## What this is
 
-## What is this?
+This is a billing and payment SaaS for Indian freelancers, consultants, small businesses, and app builders.
 
-This is a **billing and payment tool** built for Indian freelancers, consultants, and small businesses.
+You create an account on your platform, add your bank and UPI details, and the system generates a QR-backed checkout flow for you. Customers pay using UPI or bank transfer, and your dashboard marks the invoice paid after you confirm it.
 
-You create invoices, share a payment link with your client, your client pays via UPI or bank transfer, and you confirm it. That's it. Everything is tracked, emails are sent automatically, and you get a proper GST-compliant PDF for every invoice.
+If you are a developer, you can use the API from your own website or app. The customer clicks `Proceed to Pay` on your site, your backend creates or sends the payment request, the customer receives a hosted payment page and email with a unique UPI QR code generated from your configured UPI ID, pays, and then your backend unlocks the paid content after the webhook confirms the payment.
 
-If you are a developer, your app can do all of this automatically using the API — no manual work needed.
+## What problem it solves
 
----
-
-## What problem does it solve?
-
-Most small business owners in India do this today:
+Most businesses still do billing like this:
 
 1. Make a bill in Word or Excel
-2. Send it over WhatsApp or email
-3. Tell the client "pay on this UPI ID"
-4. Manually check their phone for the payment
-5. Note it down in a register or spreadsheet
+2. Send it by WhatsApp or email
+3. Tell the customer to pay on a UPI ID
+4. Check the phone manually for payment
+5. Update a spreadsheet
 
-This is slow, unprofessional, and easy to lose track of.
+This platform replaces that manual workflow with:
 
-**This tool replaces that entire workflow:**
+- GST invoice generation
+- UPI QR and bank transfer payment details
+- Email delivery to the customer
+- Payment proof submission using UTR
+- Merchant confirmation or rejection
+- Payment confirmation email
+- Webhook-based access unlock for developer apps
 
-- Generates a clean, GST-compliant invoice PDF automatically
-- Sends it to your client via email with a payment link
-- Shows your client a UPI QR code — they scan and pay
-- Lets the client submit their transaction ID as proof
-- Notifies you so you can confirm the payment
-- Sends the client a payment receipt automatically
-
----
-
-## Who is this for?
+## Who it is for
 
 | Type | Example |
 |---|---|
 | Freelancers | Designers, developers, writers, photographers |
 | Consultants | CA, lawyers, business advisors |
 | Small businesses | Agencies, shops, service providers |
-| Developers / SaaS builders | Anyone who wants to automate billing inside their own app |
+| Developers / SaaS builders | Anyone who wants to charge for access or services |
 
----
+## How it works
 
-## How it works — in plain English
+### Merchant dashboard flow
 
+```text
+You sign up on the SaaS platform
+    -> Complete a first-run onboarding screen
+    -> Add bank details and UPI ID
+    -> System generates your QR-backed payment identity
+    -> Create an invoice
+    -> Customer receives an email with a payment link and QR code
+    -> Customer opens the hosted payment page
+    -> Customer scans the UPI QR code or uses bank transfer details
+    -> Customer submits the UTR / payment reference
+    -> You review it in the dashboard
+    -> You confirm or reject the payment
+    -> Customer receives a confirmation email
+    -> Invoice status becomes Paid
 ```
-You create an invoice
-    → Client receives an email with a payment link
-    → Client opens the link, scans the UPI QR code, and pays
-    → Client enters their transaction ID (UTR) on the page
-    → You see it on your dashboard and click Confirm
-    → Client receives a payment receipt email
-    → Invoice is marked as Paid
-```
 
----
+### Developer checkout flow
+
+```text
+Customer clicks "Proceed to Pay" on your website
+    -> Your backend calls POST /checkout/create with your API key
+    -> The gateway creates the invoice, stores your external order ID, and sends the payment request
+    -> Customer gets a payment email and hosted payment page
+    -> Customer pays using the QR code or bank transfer details tied to your account
+    -> Your webhook receives payment.confirmed
+    -> Your app unlocks the paid content
+```
 
 ## Features
 
-### For Business Owners
-- Create GST invoices in seconds
-- Auto-calculates subtotal, CGST, SGST, and total
-- Download invoices as professional PDF files
-- Share a payment link with any client — no app needed on their side
-- UPI QR code on the payment page — client just scans and pays
-- Bank transfer details shown if you prefer NEFT/IMPS
-- Email sent to client automatically when you send the invoice
-- Payment receipt emailed to client when you confirm payment
-- Dashboard to track all invoices — Draft, Sent, Pending, Paid, Cancelled
-- Manage multiple UPI IDs and bank accounts
+### For business owners
 
-### For Developers
-- Full REST API — create invoices, send them, confirm payments programmatically
-- API keys for secure access from your own app
-- Webhooks — your app gets notified instantly when a payment is confirmed or rejected
-- Rate limiting built in so the API stays stable under load
+- Create GST invoices in seconds
+- Auto-calculate subtotal, GST, and total
+- Download professional PDF invoices
+- Show UPI QR codes and bank transfer details
+- Email the invoice and payment link to your customer
+- Track invoices as Draft, Sent, Pending, Paid, and Cancelled
+- Confirm or reject submitted payment proof
+- Manage multiple payment methods
+
+### For developers
+
+- REST API for invoices, payment methods, keys, and webhooks
+- JWT for dashboard access
+- API keys for server-to-server integration
+- Payment confirmation webhooks
+- QR-based checkout flow tied to the merchant's UPI ID
+- Access unlock after payment confirmation
+- Rate limiting for stability
 - Interactive API docs at `/docs`
 
----
+## Developer integration flow
+
+1. Your app receives `Proceed to Pay`
+2. Your backend creates an invoice with the API
+3. Your backend sends the invoice to the customer
+4. The customer receives:
+   - a hosted payment page
+   - a UPI QR code based on your configured UPI ID
+   - bank transfer details if configured
+5. The customer submits their payment proof
+6. Your backend confirms the payment
+7. Your webhook receives `payment.confirmed`
+8. Your app grants access to the paid content
 
 ## Plans
 
 | Plan | Price | Invoices per month | API rate limit |
 |---|---|---|---|
-| Free | ₹0 | 5 | 30 requests/min |
-| Starter | ₹499/month | 100 | 60 requests/min |
-| Pro | ₹1499/month | Unlimited | 120 requests/min |
+| Free | Rs. 0 | 5 | 30 requests/min |
+| Starter | Rs. 499/month | 100 | 60 requests/min |
+| Pro | Rs. 1,499/month | Unlimited | 120 requests/min |
 
-To upgrade, go to **Billing** in the dashboard, pick a plan, make the payment, and submit your transaction ID. Your account will be upgraded within 24 hours.
+## Dashboard usage
 
----
+### 1. Sign up
 
-## Using the Dashboard (for business owners)
+Create an account with your name, email, and business name. This becomes the merchant profile in your SaaS.
 
-### Step 1 — Sign up
-Go to the app, create an account with your name, email, and business name.
+Right after signup, the app now sends you to an onboarding screen so you can add your UPI ID and bank details before using the dashboard.
 
-### Step 2 — Add your payment details
-Go to **Payment Methods** and add:
-- Your UPI ID (e.g. `yourname@okaxis`) — clients will see a QR code to scan
-- Or your bank account details (account number, IFSC) for bank transfers
+### 2. Add payment methods
 
-### Step 3 — Create an invoice
-Go to **Invoices → New Invoice** and fill in:
-- Your client's name and email
-- What you did (line items) with quantity and rate
-- GST rate (default 18%)
-- Due date (optional)
+Go to Payment Methods and add:
 
-The total is calculated automatically.
+- UPI ID for QR payments
+- Bank account details for transfers
 
-### Step 4 — Send it
-Click **Send Invoice**. Your client receives an email with a payment link. The invoice status changes to **Sent**.
+### 3. Create an invoice
 
-### Step 5 — Client pays
-Your client opens the link, sees your UPI QR code, scans it, and pays. They enter their transaction ID on the page and submit. The invoice status changes to **Pending**.
+Go to Invoices -> New Invoice and enter:
 
-### Step 6 — Confirm the payment
-You get notified. Go to the invoice, check the transaction ID, and click **Confirm Payment**. The invoice is marked **Paid** and your client receives a receipt email automatically.
+- Customer name and email
+- Line items
+- GST rate
+- Optional due date and notes
 
----
+### 4. Send it
 
-## Using the API (for developers)
+Click Send Invoice. The customer gets:
 
-If you want your own app to create and manage invoices automatically, use the API.
+- An email with a payment link
+- A QR code if UPI is configured
+- A PDF invoice attachment
 
-### Step 1 — Get an API key
-Log in to the dashboard → go to **API Keys** → click **Create Key**. Copy the key (it starts with `inv_`). It is shown only once — save it securely.
+### 5. Customer pays
 
-### Step 2 — Create an invoice from your app
+The customer opens the link, scans the QR code tied to your UPI ID, pays, and submits the UTR.
+
+### 6. Confirm payment
+
+You review the proof in the invoice detail page and confirm or reject it.
+
+## API usage for developers
+
+### Get an API key
+
+Log in to the dashboard, open API Keys, and create a key.
+
+- Keys start with `inv_`
+- The raw key is shown only once
+- Store it securely
+
+### Create an invoice
 
 ```http
 POST /invoices
@@ -153,18 +186,50 @@ Content-Type: application/json
 }
 ```
 
-### Step 3 — Send the invoice
+### Create a checkout session
+
+Use this when your own product needs to trigger payment after `Proceed to Pay`.
+
+```http
+POST /checkout/create
+Authorization: Bearer inv_your_api_key_here
+Content-Type: application/json
+
+{
+  "customer_name": "Rahul Sharma",
+  "customer_email": "rahul@example.com",
+  "external_reference_id": "order_12345",
+  "gateway_metadata": {
+    "product_id": "premium-plan",
+    "success_redirect": "https://your-app.com/success"
+  },
+  "line_items": [
+    { "name": "Premium Plan", "quantity": 1, "rate": 4999 }
+  ],
+  "gst_rate": 18,
+  "discount": 0,
+  "currency": "INR"
+}
+```
+
+Response fields include:
+
+- `invoice_id`
+- `invoice_number`
+- `payment_url`
+- `qr_b64`
+- `external_reference_id`
+
+### Send the invoice
 
 ```http
 POST /invoices/{invoice_id}/send
 Authorization: Bearer inv_your_api_key_here
 ```
 
-Your client gets an email with the payment link automatically.
+The customer receives the email and hosted payment page.
 
-### Step 4 — Get notified when payment arrives (webhooks)
-
-Register your webhook URL once:
+### Register a webhook
 
 ```http
 POST /webhooks/config
@@ -173,121 +238,80 @@ Authorization: Bearer inv_your_api_key_here
 { "url": "https://your-app.com/webhooks/payment" }
 ```
 
-When a payment is confirmed, your URL receives:
+When payment is confirmed, your endpoint receives:
 
 ```json
 {
   "event": "payment.confirmed",
   "invoice_id": "...",
   "invoice_number": "INV-2025-0001",
-  "amount": 29500.00,
+  "amount": 29500.0,
   "currency": "INR",
   "customer_name": "Rahul Sharma",
   "utr": "SBIN0023456789"
 }
 ```
 
-Verify the webhook is genuine using the `X-Invoice-Signature` header:
-
-```python
-import hmac, hashlib
-
-def is_valid(body: str, secret: str, signature: str) -> bool:
-    expected = hmac.new(secret.encode(), body.encode(), hashlib.sha256).hexdigest()
-    return hmac.compare_digest(expected, signature)
-```
-
-### Step 5 — Confirm payment from your app (optional)
-
-If you want to auto-confirm instead of doing it manually:
+### Confirm payment from your app
 
 ```http
 POST /invoices/{invoice_id}/confirm-payment
 Authorization: Bearer inv_your_api_key_here
 ```
 
----
+After confirmation, your app can unlock the paid content, subscription, file, course, or service.
 
-## Setting Up (for developers running this locally)
+## Local setup
 
-### What you need
-- Python 3.10 or higher
-- Node.js 18 or higher
-- PostgreSQL (or use SQLite for quick local testing)
-- A free [SendGrid](https://sendgrid.com) account for emails (optional for local dev)
-- A free [Upstash](https://upstash.com) Redis account for caching (optional for local dev)
-
-### Backend setup
+### Backend
 
 ```bash
 cd backend
-
-# Create a virtual environment
 python -m venv venv
-
-# Activate it
-# Windows:
 .\venv\Scripts\activate
-# Mac / Linux:
-source venv/bin/activate
-
-# Install dependencies
 pip install -r requirements.txt
-
-# Set up environment variables
-cp .env.example .env
-# Open .env and fill in DATABASE_URL and SECRET_KEY at minimum
-
-# Run database migrations
-alembic upgrade head
-
-# Start the server
+copy .env.example .env
 python run.py
 ```
 
-Backend runs at `http://localhost:8000`
-API docs (interactive) available at `http://localhost:8000/docs`
+Backend:
 
-### Frontend setup
+- `http://localhost:8000`
+- API docs: `http://localhost:8000/docs`
+
+### Frontend
 
 ```bash
 cd frontend
-
-# Install dependencies
 npm install
-
-# Set up environment variables
-cp .env.local.example .env.local
-# Make sure NEXT_PUBLIC_API_URL=http://localhost:8000
-
-# Start the dev server
+copy .env.local.example .env.local
 npm run dev
 ```
 
-Frontend runs at `http://localhost:3000`
+Frontend:
 
-### Minimum .env values to get started locally
+- `http://localhost:3000`
+
+## Minimum environment values
 
 ```env
 DATABASE_URL=sqlite:///./app.db
 SECRET_KEY=any-long-random-string-here
 APP_URL=http://localhost:3000
+NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
 
-Everything else (SendGrid, Redis, Upstash) is optional — the app works without them, just without emails and caching.
-
----
-
-## API Quick Reference
+## API quick reference
 
 | Action | Method | Endpoint |
 |---|---|---|
 | Sign up | POST | `/auth/signup` |
 | Log in | POST | `/auth/login` |
 | Create invoice | POST | `/invoices` |
+| Create checkout session | POST | `/checkout/create` |
 | List invoices | GET | `/invoices` |
 | Get one invoice | GET | `/invoices/{id}` |
-| Send invoice to client | POST | `/invoices/{id}/send` |
+| Send invoice | POST | `/invoices/{id}/send` |
 | Download PDF | GET | `/invoices/{id}/pdf` |
 | Cancel invoice | DELETE | `/invoices/{id}` |
 | Confirm payment | POST | `/invoices/{id}/confirm-payment` |
@@ -304,18 +328,24 @@ Everything else (SendGrid, Redis, Upstash) is optional — the app works without
 | View plans | GET | `/billing/plans` |
 | Request plan upgrade | POST | `/billing/upgrade-request` |
 
-Full interactive docs with request/response examples: `http://localhost:8000/docs`
+## Verification
 
----
+Run these before shipping:
 
-## Tech Stack
+```bash
+cd backend
+python -m pytest -q
+```
 
-| Part | Technology |
-|---|---|
-| Backend API | Python, FastAPI |
-| Database | PostgreSQL / SQLite |
-| Frontend | Next.js, TypeScript, Tailwind CSS |
-| PDF generation | ReportLab |
-| Emails | SendGrid |
-| Caching | Redis (Upstash) |
-| UPI QR codes | qrcode library |
+```bash
+cd frontend
+npm run build
+```
+
+## Notes
+
+- Dashboard routes live under `/dashboard/...`
+- Root aliases redirect to the dashboard routes
+- The public payment page shows QR code and bank details
+- Bank fields use `account_holder`, `account_number`, and `ifsc_code`
+- Backend tests use SQLite in-memory support

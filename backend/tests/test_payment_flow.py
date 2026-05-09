@@ -120,3 +120,61 @@ def test_full_payment_flow_can_send_submit_and_confirm(client):
     payments = client.get(f"/invoices/{invoice['id']}/payments", headers=headers)
     assert payments.status_code == 200
     assert payments.json()[-1]["status"] == "confirmed"
+
+
+def test_checkout_session_uses_api_key_and_preserves_external_reference(client):
+    headers = _auth_headers(client, email="merchant3@example.com")
+
+    client.post(
+        "/payment-methods/upi",
+        json={
+            "label": "Primary UPI",
+            "upi_id": "merchant3@okaxis",
+            "upi_name": "Acme Studio",
+            "is_default": True,
+        },
+        headers=headers,
+    )
+
+    api_key = client.post(
+        "/keys",
+        json={"name": "Storefront Gateway"},
+        headers=headers,
+    )
+    assert api_key.status_code == 201
+    raw_key = api_key.json()["raw_key"]
+
+    checkout = client.post(
+        "/checkout/create",
+        json={
+            "customer_name": "Priya Verma",
+            "customer_email": "priya@example.com",
+            "customer_phone": "9000000000",
+            "external_reference_id": "order_12345",
+            "gateway_metadata": {
+                "product_id": "xyz-annual",
+                "success_redirect": "https://merchant.example.com/success",
+            },
+            "line_items": [
+                {"name": "Premium Plan", "quantity": 1, "rate": 4999},
+            ],
+            "gst_rate": 18,
+            "discount": 0,
+            "currency": "INR",
+        },
+        headers={"Authorization": f"Bearer {raw_key}"},
+    )
+    assert checkout.status_code == 200
+
+    payload = checkout.json()
+    assert payload["invoice_number"]
+    assert payload["payment_url"].endswith(f"/pay/{payload['invoice_id']}")
+    assert payload["qr_b64"]
+    assert payload["external_reference_id"] == "order_12345"
+
+    invoice = client.get(f"/invoices/{payload['invoice_id']}", headers=headers)
+    assert invoice.status_code == 200
+    stored = invoice.json()
+    assert stored["external_reference_id"] == "order_12345"
+    assert stored["gateway_metadata"]["product_id"] == "xyz-annual"
+    assert stored["status"] == "sent"

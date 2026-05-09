@@ -25,6 +25,8 @@ class InvoiceCreate(BaseModel):
     customer_phone: str | None = None
     customer_address: str | None = None
     customer_gstin: str | None = None
+    external_reference_id: str | None = None
+    gateway_metadata: dict[str, object] | None = None
     line_items: list[LineItem]
     gst_rate: float = 18.0
     discount: float = 0.0
@@ -53,6 +55,8 @@ class InvoiceUpdate(BaseModel):
     customer_phone: str | None = None
     customer_address: str | None = None
     customer_gstin: str | None = None
+    external_reference_id: str | None = None
+    gateway_metadata: dict[str, object] | None = None
     line_items: list[LineItem] | None = None
     gst_rate: float | None = None
     discount: float | None = None
@@ -69,6 +73,8 @@ class InvoiceOut(BaseModel):
     customer_phone: str | None
     customer_address: str | None
     customer_gstin: str | None
+    external_reference_id: str | None
+    gateway_metadata: dict[str, object] | None
     line_items: list
     subtotal: float
     gst_rate: float
@@ -85,3 +91,14 @@ class InvoiceOut(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class CheckoutSessionOut(BaseModel):
+    invoice_id: UUID
+    invoice_number: str
+    payment_url: str
+    qr_b64: str | None = None
+    amount: float
+    currency: str
+    status: str
+    external_reference_id: str | None = None

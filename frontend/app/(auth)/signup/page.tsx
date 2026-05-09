@@ -26,7 +26,7 @@ export default function SignupPage() {
       const key = await api.createKey('Default')
       localStorage.setItem('active_api_key', key.raw_key)
 
-      router.push('/dashboard')
+      router.push('/onboarding')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Signup failed')
     } finally {

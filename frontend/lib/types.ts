@@ -40,6 +40,8 @@ export interface Invoice {
   customer_phone: string | null
   customer_address: string | null
   customer_gstin: string | null
+  external_reference_id: string | null
+  gateway_metadata: Record<string, unknown> | null
   line_items: LineItem[]
   subtotal: number
   gst_rate: number
@@ -54,6 +56,17 @@ export interface Invoice {
   payment_link: string | null
   created_at: string
   updated_at: string
+}
+
+export interface CheckoutSession {
+  invoice_id: string
+  invoice_number: string
+  payment_url: string
+  qr_b64: string | null
+  amount: number
+  currency: string
+  status: string
+  external_reference_id: string | null
 }
 
 export interface Payment {

@@ -35,6 +35,10 @@ class Invoice(Base):
     total = Column(Float, nullable=False, default=0.0)
     currency = Column(String, default="INR")
 
+    # Developer checkout tracking
+    external_reference_id = Column(String, nullable=True, index=True)
+    gateway_metadata = Column(JSON, nullable=True)
+
     # Status
     status = Column(String, default="draft")  # draft | sent | paid | cancelled | overdue
 

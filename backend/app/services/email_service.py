@@ -33,7 +33,18 @@ class EmailService:
         merchant_name: str,
         pdf_bytes: bytes | None = None,
         payment_link: str | None = None,
+        qr_b64: str | None = None,
     ) -> bool:
+        qr_block = (
+            f"""
+            <div style='text-align:center;margin:24px 0'>
+              <p style='color:#64748b;font-size:13px;margin-bottom:12px'>Scan to pay via UPI</p>
+              <img src='data:image/png;base64,{qr_b64}' alt='UPI QR code'
+                   style='width:220px;height:220px;border:1px solid #e2e8f0;border-radius:12px;padding:8px;background:#fff' />
+            </div>
+            """
+            if qr_b64 else ""
+        )
         pay_btn = (
             f"<p style='text-align:center;margin:28px 0'><a href='{payment_link}' style='{_BTN}'>Pay Now</a></p>"
             if payment_link else ""
@@ -42,6 +53,7 @@ class EmailService:
           <h2 style='color:#1e3a5f;margin-top:0'>Invoice {invoice_number}</h2>
           <p>Hi {customer_name},</p>
           <p>Please find invoice <strong>{invoice_number}</strong> from <strong>{merchant_name}</strong> attached.</p>
+          {qr_block}
           {pay_btn}
           <p style='color:#64748b;font-size:13px'>The PDF invoice is attached for your records.</p>
           {_FOOT}</div></div>"""
