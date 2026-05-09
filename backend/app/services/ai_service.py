@@ -6,8 +6,16 @@ from typing import Any
 import httpx
 from fastapi import HTTPException, status
 from groq import Groq
-from pdf2image import convert_from_bytes
-from PIL import Image
+
+try:
+    from pdf2image import convert_from_bytes
+except ImportError:  # pragma: no cover - optional dependency for PDF scanning
+    convert_from_bytes = None
+
+try:
+    from PIL import Image
+except ImportError:  # pragma: no cover - optional dependency for PDF scanning
+    Image = None
 
 from app.config import settings
 
@@ -270,6 +278,11 @@ class AIService:
     @classmethod
     def _prepare_visual_input(cls, file_content: bytes, mime_type: str) -> tuple[bytes, str]:
         if mime_type == "application/pdf":
+            if convert_from_bytes is None:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="PDF scanning is unavailable because pdf2image is not installed.",
+                )
             try:
                 images = convert_from_bytes(file_content, first_page=1, last_page=1, fmt="png")
             except Exception as exc:
@@ -289,7 +302,12 @@ class AIService:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only images and PDFs are supported")
 
     @staticmethod
-    def _image_to_png_bytes(image: Image.Image) -> bytes:
+    def _image_to_png_bytes(image) -> bytes:
+        if Image is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Image conversion is unavailable because Pillow is not installed.",
+            )
         buffer = BytesIO()
         image.save(buffer, format="PNG")
         return buffer.getvalue()

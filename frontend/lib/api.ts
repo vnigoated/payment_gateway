@@ -9,7 +9,8 @@ function jwt() {
 
 function activeKey() {
   if (typeof window === 'undefined') return null
-  return localStorage.getItem('active_api_key')
+  const key = localStorage.getItem('active_api_key')
+  return key && key.startsWith('inv_') ? key : null
 }
 
 async function req<T>(
@@ -18,13 +19,13 @@ async function req<T>(
   auth: 'jwt' | 'apikey' | 'dashboard' | 'none' = 'jwt',
 ): Promise<T> {
   const token =
-    auth === 'apikey'
-      ? activeKey()
+      auth === 'apikey'
+        ? activeKey()
       : auth === 'dashboard'
-        ? jwt() ?? activeKey()
-        : auth === 'jwt'
-          ? jwt()
-          : null
+        ? jwt()
+          : auth === 'jwt'
+            ? jwt()
+            : null
   const res = await fetch(`${BASE}${path}`, {
     ...opts,
     headers: {
@@ -68,6 +69,15 @@ export const api = {
     req<Invoice[]>(`/invoices${status ? `?status=${status}` : ''}`, {}, 'dashboard'),
 
   getInvoice: (id: string) => req<Invoice>(`/invoices/${id}`, {}, 'dashboard'),
+
+  downloadInvoicePdf: async (id: string) => {
+    const token = jwt()
+    const res = await fetch(`${BASE}/invoices/${id}/pdf`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+    if (!res.ok) throw new Error('Failed to download invoice PDF')
+    return res.blob()
+  },
 
   cancelInvoice: (id: string) =>
     req<null>(`/invoices/${id}`, { method: 'DELETE' }, 'dashboard'),

@@ -18,10 +18,6 @@ export default function LoginPage() {
       const data = await api.login(form)
       localStorage.setItem('jwt_token', data.access_token)
 
-      // Load first active API key
-      const keys = await api.listKeys()
-      if (keys.length > 0) localStorage.setItem('active_api_key', keys[0].key_prefix)
-
       router.push('/dashboard')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Login failed')

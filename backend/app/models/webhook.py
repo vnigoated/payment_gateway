@@ -1,8 +1,8 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, DateTime, Integer, String, Text
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy import Column, DateTime, Integer, JSON, String, Text
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy import ForeignKey
 
@@ -15,7 +15,7 @@ class WebhookDelivery(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     event = Column(String, nullable=False)       # payment.confirmed | payment.rejected
-    payload = Column(JSONB, nullable=False)
+    payload = Column(JSON, nullable=False)
     status = Column(String, nullable=False)      # delivered | failed
     response_code = Column(Integer, nullable=True)
     error = Column(Text, nullable=True)

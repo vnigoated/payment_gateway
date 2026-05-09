@@ -1,5 +1,5 @@
-import { NewInvoiceForm } from '@/components/invoices/new-invoice-form'
+import { redirect } from 'next/navigation'
 
-export default function NewInvoicePage() {
-  return <NewInvoiceForm />
+export default function NewInvoiceAliasPage() {
+  redirect('/dashboard/invoices/new')
 }

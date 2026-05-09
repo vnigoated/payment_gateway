@@ -29,7 +29,7 @@ class InvoiceService:
         return subtotal, gst_amount, total
 
     @staticmethod
-    def create(db: Session, user: User, api_key: APIKey, payload: InvoiceCreate) -> Invoice:
+    def create(db: Session, user: User, api_key: APIKey | None, payload: InvoiceCreate) -> Invoice:
         # Enforce free tier limit
         if user.plan == "free" and user.invoice_count_this_month >= settings.FREE_INVOICE_LIMIT:
             from fastapi import HTTPException
@@ -48,7 +48,7 @@ class InvoiceService:
 
         invoice = Invoice(
             user_id=user.id,
-            api_key_id=api_key.id,
+            api_key_id=api_key.id if api_key else None,
             invoice_number=InvoiceService._generate_invoice_number(db, user.id),
             customer_name=payload.customer_name,
             customer_email=payload.customer_email,

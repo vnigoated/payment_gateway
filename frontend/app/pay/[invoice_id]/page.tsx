@@ -131,13 +131,13 @@ export default function PaymentPage({ params }: { params: { invoice_id: string }
                   </div>
                   <div className="flex justify-between items-center py-2 border-b">
                     <span className="text-slate-500">Account Name</span>
-                    <span className="font-medium">{bank_method.bank_account_name}</span>
+                    <span className="font-medium">{bank_method.account_holder}</span>
                   </div>
                   <div className="flex justify-between items-center py-2 border-b">
                     <span className="text-slate-500">Account Number</span>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono font-medium">{bank_method.bank_account_number}</span>
-                      <button onClick={() => copyToClipboard(bank_method.bank_account_number || '')} className="text-slate-400 hover:text-brand-600">
+                      <span className="font-mono font-medium">{bank_method.account_number}</span>
+                      <button onClick={() => copyToClipboard(bank_method.account_number || '')} className="text-slate-400 hover:text-brand-600">
                         <Copy size={14} />
                       </button>
                     </div>
@@ -145,8 +145,8 @@ export default function PaymentPage({ params }: { params: { invoice_id: string }
                   <div className="flex justify-between items-center py-2">
                     <span className="text-slate-500">IFSC Code</span>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono font-medium">{bank_method.bank_ifsc}</span>
-                      <button onClick={() => copyToClipboard(bank_method.bank_ifsc || '')} className="text-slate-400 hover:text-brand-600">
+                      <span className="font-mono font-medium">{bank_method.ifsc_code}</span>
+                      <button onClick={() => copyToClipboard(bank_method.ifsc_code || '')} className="text-slate-400 hover:text-brand-600">
                         <Copy size={14} />
                       </button>
                     </div>

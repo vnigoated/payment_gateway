@@ -1,8 +1,8 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, DateTime, Date, Float, ForeignKey, String, Text
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy import Column, DateTime, Date, Float, ForeignKey, JSON, String, Text
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -25,7 +25,7 @@ class Invoice(Base):
     customer_gstin = Column(String, nullable=True)
 
     # Line items stored as JSON: [{name, quantity, rate, amount}]
-    line_items = Column(JSONB, nullable=False, default=list)
+    line_items = Column(JSON, nullable=False, default=list)
 
     # Financials
     subtotal = Column(Float, nullable=False, default=0.0)
