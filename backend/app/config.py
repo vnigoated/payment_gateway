@@ -17,10 +17,18 @@ class Settings(BaseSettings):
 
     APP_NAME: str = "Invoice API"
     APP_URL: str = "http://localhost:8000"
+    FRONTEND_URL: str = "http://localhost:3000"
     ENVIRONMENT: str = "development"
 
     # Plan limits (invoices per month)
     FREE_INVOICE_LIMIT: int = 5
+
+    RAZORPAY_KEY_ID: str = ""
+    RAZORPAY_KEY_SECRET: str = ""
+    RAZORPAY_WEBHOOK_SECRET: str = ""
+    RAZORPAY_STARTER_PLAN_ID: str = ""
+    RAZORPAY_PRO_PLAN_ID: str = ""
+
     GROQ_API_KEY: str = ""
     AI_SCAN_MODEL: str = "llama-3.2-11b-vision-preview"
     GEMINI_API_KEY: str = ""

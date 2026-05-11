@@ -33,6 +33,10 @@ class UserOut(BaseModel):
     phone: str | None = None
     plan: str
     invoice_count_this_month: int
+    razorpay_customer_id: str | None = None
+    razorpay_subscription_id: str | None = None
+    subscription_status: str | None = None
+    current_period_end: datetime | None = None
     is_active: bool
     webhook_url: str | None = None
     created_at: datetime

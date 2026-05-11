@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -24,3 +24,34 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+def ensure_subscription_columns() -> None:
+    """Add nullable billing columns for older dev databases created before billing."""
+    inspector = inspect(engine)
+    if "users" not in inspector.get_table_names():
+        return
+
+    existing = {column["name"] for column in inspector.get_columns("users")}
+    if settings.DATABASE_URL.startswith("postgresql"):
+        column_types = {
+            "razorpay_customer_id": "VARCHAR",
+            "razorpay_subscription_id": "VARCHAR",
+            "subscription_status": "VARCHAR",
+            "current_period_end": "TIMESTAMP WITH TIME ZONE",
+        }
+    else:
+        column_types = {
+            "razorpay_customer_id": "VARCHAR",
+            "razorpay_subscription_id": "VARCHAR",
+            "subscription_status": "VARCHAR",
+            "current_period_end": "DATETIME",
+        }
+
+    missing = [name for name in column_types if name not in existing]
+    if not missing:
+        return
+
+    with engine.begin() as conn:
+        for name in missing:
+            conn.execute(text(f"ALTER TABLE users ADD COLUMN {name} {column_types[name]}"))

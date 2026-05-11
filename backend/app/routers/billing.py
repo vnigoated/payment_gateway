@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -6,6 +6,7 @@ from app.config import settings
 from app.database import get_db
 from app.models.user import User
 from app.services.email_service import EmailService
+from app.services.razorpay_service import create_subscription, unix_to_utc, verify_webhook_signature
 from app.utils.security import get_current_user
 
 router = APIRouter(prefix="/billing", tags=["Billing"])
@@ -45,7 +46,111 @@ def list_plans():
 
 @router.get("/current")
 def current_plan(user: User = Depends(get_current_user)):
-    return {"plan": user.plan, **PLANS.get(user.plan, PLANS["free"])}
+    return {
+        "plan": user.plan,
+        **PLANS.get(user.plan, PLANS["free"]),
+        "razorpay_subscription_id": user.razorpay_subscription_id,
+        "subscription_status": user.subscription_status,
+        "current_period_end": user.current_period_end,
+    }
+
+
+class CheckoutRequest(BaseModel):
+    plan: str
+
+
+@router.post("/checkout")
+def create_billing_checkout(
+    payload: CheckoutRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if payload.plan not in ("starter", "pro"):
+        raise HTTPException(400, detail="Plan must be 'starter' or 'pro'")
+    if payload.plan == user.plan and user.subscription_status in ("active", "authenticated"):
+        raise HTTPException(400, detail=f"You are already on the {user.plan} plan")
+
+    subscription = create_subscription(user, payload.plan)
+
+    user.razorpay_subscription_id = subscription["id"]
+    user.subscription_status = subscription.get("status", "created")
+    db.commit()
+    db.refresh(user)
+
+    return {
+        "key_id": settings.RAZORPAY_KEY_ID,
+        "subscription_id": subscription["id"],
+        "short_url": subscription.get("short_url"),
+        "plan": payload.plan,
+        "amount": PLANS[payload.plan]["price_inr"],
+        "currency": "INR",
+        "merchant_name": settings.APP_NAME,
+        "prefill": {
+            "name": user.name,
+            "email": user.email,
+        },
+    }
+
+
+def _subscription_from_event(event: dict):
+    return event.get("payload", {}).get("subscription", {}).get("entity", {})
+
+
+def _plan_from_subscription(subscription: dict) -> str | None:
+    notes = subscription.get("notes") or {}
+    plan = notes.get("plan")
+    return plan if plan in ("starter", "pro") else None
+
+
+def _user_from_subscription(db: Session, subscription: dict) -> User | None:
+    notes = subscription.get("notes") or {}
+    user_id = notes.get("user_id")
+    subscription_id = subscription.get("id")
+    query = db.query(User)
+    if user_id:
+        user = query.filter(User.id == user_id).first()
+        if user:
+            return user
+    if subscription_id:
+        return query.filter(User.razorpay_subscription_id == subscription_id).first()
+    return None
+
+
+@router.post("/razorpay/webhook")
+async def razorpay_webhook(request: Request, db: Session = Depends(get_db)):
+    raw_body = await request.body()
+    signature = request.headers.get("X-Razorpay-Signature")
+    if not verify_webhook_signature(raw_body, signature):
+        raise HTTPException(400, detail="Invalid Razorpay signature")
+
+    event = await request.json()
+    event_name = event.get("event")
+    subscription = _subscription_from_event(event)
+    if not subscription:
+        return {"ok": True}
+
+    user = _user_from_subscription(db, subscription)
+    if not user:
+        return {"ok": True}
+
+    subscription_id = subscription.get("id")
+    if subscription_id:
+        user.razorpay_subscription_id = subscription_id
+    user.subscription_status = subscription.get("status") or user.subscription_status
+
+    plan = _plan_from_subscription(subscription)
+    if event_name in ("subscription.activated", "subscription.charged") and plan:
+        user.plan = plan
+    elif event_name in ("subscription.cancelled", "subscription.halted", "subscription.paused"):
+        user.plan = "free"
+
+    user.current_period_end = (
+        unix_to_utc(subscription.get("current_end"))
+        or unix_to_utc(subscription.get("end_at"))
+        or user.current_period_end
+    )
+    db.commit()
+    return {"ok": True}
 
 
 class UpgradeRequest(BaseModel):

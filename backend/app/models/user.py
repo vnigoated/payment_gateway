@@ -27,6 +27,11 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)
 
+    razorpay_customer_id = Column(String, nullable=True)
+    razorpay_subscription_id = Column(String, nullable=True, index=True)
+    subscription_status = Column(String, nullable=True)
+    current_period_end = Column(DateTime(timezone=True), nullable=True)
+
     # Outgoing webhooks
     webhook_url = Column(String, nullable=True)
     webhook_secret = Column(String, nullable=True)

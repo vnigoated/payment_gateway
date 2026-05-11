@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, FileText, Key, CreditCard, LogOut, Zap } from 'lucide-react'
+import { LayoutDashboard, FileText, Key, CreditCard, LogOut, Zap, BadgeIndianRupee } from 'lucide-react'
 import { cn, PLAN_COLORS } from '@/lib/utils'
 import type { User } from '@/lib/types'
 
@@ -10,6 +10,7 @@ const NAV = [
   { href: '/dashboard/invoices',   label: 'Invoices',         icon: FileText },
   { href: '/dashboard/api-keys',   label: 'API Keys',         icon: Key },
   { href: '/dashboard/payment-methods', label: 'Payment Methods', icon: CreditCard },
+  { href: '/dashboard/billing',     label: 'Billing',          icon: BadgeIndianRupee },
 ]
 
 export function Sidebar({ user, onLogout }: { user: User | null; onLogout: () => void }) {

@@ -1,4 +1,16 @@
-import type { User, APIKey, APIKeyCreated, Invoice, InvoiceScanResult, Payment, PaymentMethod, CheckoutSession } from './types'
+import type {
+  User,
+  APIKey,
+  APIKeyCreated,
+  BillingCheckout,
+  BillingPlan,
+  CheckoutSession,
+  CurrentBillingPlan,
+  Invoice,
+  InvoiceScanResult,
+  Payment,
+  PaymentMethod,
+} from './types'
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -50,6 +62,13 @@ export const api = {
     req<{ access_token: string; user: User }>('/auth/login', { method: 'POST', body: JSON.stringify(data) }, 'none'),
 
   getMe: () => req<User>('/auth/me'),
+
+  listPlans: () => req<Record<string, BillingPlan>>('/billing/plans'),
+
+  getCurrentPlan: () => req<CurrentBillingPlan>('/billing/current'),
+
+  createBillingCheckout: (plan: 'starter' | 'pro') =>
+    req<BillingCheckout>('/billing/checkout', { method: 'POST', body: JSON.stringify({ plan }) }),
 
   // ── API Keys ────────────────────────────────────────────────────────────────
 

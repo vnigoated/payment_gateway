@@ -5,8 +5,42 @@ export interface User {
   business_name: string | null
   plan: 'free' | 'starter' | 'pro'
   invoice_count_this_month: number
+  razorpay_customer_id: string | null
+  razorpay_subscription_id: string | null
+  subscription_status: string | null
+  current_period_end: string | null
   is_active: boolean
   created_at: string
+}
+
+export interface BillingPlan {
+  name: string
+  price_inr: number
+  invoices_per_month: number
+  api_calls_per_day: number
+  api_calls_per_min: number
+  features: string[]
+}
+
+export interface CurrentBillingPlan extends BillingPlan {
+  plan: 'free' | 'starter' | 'pro'
+  razorpay_subscription_id: string | null
+  subscription_status: string | null
+  current_period_end: string | null
+}
+
+export interface BillingCheckout {
+  key_id: string
+  subscription_id: string
+  short_url: string | null
+  plan: 'starter' | 'pro'
+  amount: number
+  currency: string
+  merchant_name: string
+  prefill: {
+    name: string
+    email: string
+  }
 }
 
 export interface APIKey {

@@ -5,10 +5,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
-from app.database import Base, engine
+from app.database import Base, engine, ensure_subscription_columns
 from app.routers import auth, keys, invoices, payments, payment_methods, webhooks
 from app.routers import admin, billing
 Base.metadata.create_all(bind=engine)
+ensure_subscription_columns()
 
 app = FastAPI(
     title=settings.APP_NAME,
