@@ -8,8 +8,12 @@ from app.config import settings
 from app.database import Base, engine, ensure_subscription_columns
 from app.routers import auth, keys, invoices, payments, payment_methods, webhooks
 from app.routers import admin, billing
-Base.metadata.create_all(bind=engine)
-ensure_subscription_columns()
+
+settings.validate_production_settings()
+
+if not settings.is_production:
+    Base.metadata.create_all(bind=engine)
+    ensure_subscription_columns()
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -24,7 +28,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origin_list,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],

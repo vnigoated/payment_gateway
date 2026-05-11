@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from app.config import settings
 from app.database import get_db
+from app.models.razorpay_webhook_event import RazorpayWebhookEvent
 from app.models.user import User
 from app.services.email_service import EmailService
 from app.services.razorpay_service import create_subscription, unix_to_utc, verify_webhook_signature
@@ -125,6 +127,16 @@ async def razorpay_webhook(request: Request, db: Session = Depends(get_db)):
 
     event = await request.json()
     event_name = event.get("event")
+    event_id = request.headers.get("X-Razorpay-Event-Id") or event.get("id")
+
+    if event_id:
+        db.add(RazorpayWebhookEvent(event_id=event_id, event_name=event_name))
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            return {"ok": True, "duplicate": True}
+
     subscription = _subscription_from_event(event)
     if not subscription:
         return {"ok": True}
