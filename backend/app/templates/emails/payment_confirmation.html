@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <h2 style="color:#059669;margin-top:0">Payment Confirmed &#10003;</h2>
+  <p>Hi {{ customer_name }},</p>
+  <p>
+    Your payment of <strong>{{ amount }}</strong> for invoice
+    <strong>{{ invoice_number }}</strong> has been confirmed by <strong>{{ merchant_name }}</strong>.
+  </p>
+  <p style="color:#64748b;font-size:13px">Keep this email as your payment receipt.</p>
+{% endblock %}

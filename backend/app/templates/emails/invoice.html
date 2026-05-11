@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <h2 style="color:#1e3a5f;margin-top:0">Invoice {{ invoice_number }}</h2>
+  <p>Hi {{ customer_name }},</p>
+  <p>Please find invoice <strong>{{ invoice_number }}</strong> from <strong>{{ merchant_name }}</strong> attached.</p>
+
+  {% if qr_b64 %}
+    <div style="text-align:center;margin:24px 0">
+      <p style="color:#64748b;font-size:13px;margin-bottom:12px">Scan to pay via UPI</p>
+      <img src="data:image/png;base64,{{ qr_b64 }}" alt="UPI QR code"
+           style="width:220px;height:220px;border:1px solid #e2e8f0;border-radius:12px;padding:8px;background:#fff" />
+    </div>
+  {% endif %}
+
+  {% if payment_link %}
+    <p style="text-align:center;margin:28px 0">
+      <a href="{{ payment_link }}" style="display:inline-block;padding:12px 28px;background:#1e3a5f;color:#fff;border-radius:6px;text-decoration:none;font-weight:600">Pay Now</a>
+    </p>
+  {% endif %}
+
+  <p style="color:#64748b;font-size:13px">The PDF invoice is attached for your records.</p>
+{% endblock %}
