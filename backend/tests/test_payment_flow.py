@@ -1,3 +1,6 @@
+import uuid
+
+
 def _auth_headers(client, email: str = "merchant@example.com"):
     response = client.post(
         "/auth/signup",
@@ -120,6 +123,102 @@ def test_full_payment_flow_can_send_submit_and_confirm(client):
     payments = client.get(f"/invoices/{invoice['id']}/payments", headers=headers)
     assert payments.status_code == 200
     assert payments.json()[-1]["status"] == "confirmed"
+
+
+# ── Negative tests ────────────────────────────────────────────────────────────
+
+
+def test_public_payment_page_returns_404_for_unknown_invoice(client):
+    response = client.get(f"/pay/{uuid.uuid4()}/public")
+    assert response.status_code == 404
+
+
+def test_submit_rejects_short_utr(client):
+    headers = _auth_headers(client, email="neg1@example.com")
+    invoice = _create_invoice(client, headers)
+    client.post(f"/invoices/{invoice['id']}/send", headers=headers)
+
+    response = client.post(
+        f"/pay/{invoice['id']}/submit",
+        json={"utr": "AB1"},
+    )
+    assert response.status_code == 400
+    assert "UTR" in response.json()["detail"]
+
+
+def test_submit_rejects_duplicate_utr(client):
+    headers = _auth_headers(client, email="neg2@example.com")
+    invoice = _create_invoice(client, headers)
+    client.post(f"/invoices/{invoice['id']}/send", headers=headers)
+
+    client.post(f"/pay/{invoice['id']}/submit", json={"utr": "UTR9876543"})
+    response = client.post(f"/pay/{invoice['id']}/submit", json={"utr": "UTR9876543"})
+
+    assert response.status_code == 400
+    assert "already been submitted" in response.json()["detail"]
+
+
+def test_submit_rejected_for_paid_invoice(client):
+    headers = _auth_headers(client, email="neg3@example.com")
+    client.post(
+        "/payment-methods/upi",
+        json={"label": "UPI", "upi_id": "neg3@upi", "upi_name": "Neg3", "is_default": True},
+        headers=headers,
+    )
+    invoice = _create_invoice(client, headers)
+    client.post(f"/invoices/{invoice['id']}/send", headers=headers)
+    client.post(f"/pay/{invoice['id']}/submit", json={"utr": "UTR1111111"})
+    client.post(f"/invoices/{invoice['id']}/confirm-payment", headers=headers)
+
+    response = client.post(f"/pay/{invoice['id']}/submit", json={"utr": "UTR2222222"})
+    assert response.status_code == 400
+    assert "paid" in response.json()["detail"]
+
+
+def test_confirm_payment_requires_auth(client):
+    headers = _auth_headers(client, email="neg4@example.com")
+    invoice = _create_invoice(client, headers)
+
+    response = client.post(f"/invoices/{invoice['id']}/confirm-payment")
+    assert response.status_code == 401
+
+
+def test_confirm_payment_blocked_for_wrong_merchant(client):
+    headers_a = _auth_headers(client, email="neg5a@example.com")
+    headers_b = _auth_headers(client, email="neg5b@example.com")
+    invoice = _create_invoice(client, headers_a)
+
+    response = client.post(f"/invoices/{invoice['id']}/confirm-payment", headers=headers_b)
+    assert response.status_code == 404
+
+
+def test_confirm_payment_fails_with_no_pending_payment(client):
+    headers = _auth_headers(client, email="neg6@example.com")
+    invoice = _create_invoice(client, headers)
+
+    response = client.post(f"/invoices/{invoice['id']}/confirm-payment", headers=headers)
+    assert response.status_code == 404
+    assert "No submitted payment" in response.json()["detail"]
+
+
+def test_checkout_create_rejects_invalid_api_key(client):
+    response = client.post(
+        "/checkout/create",
+        json={
+            "customer_name": "Test",
+            "customer_email": "test@example.com",
+            "customer_phone": "9000000001",
+            "line_items": [{"name": "Item", "quantity": 1, "rate": 100}],
+            "gst_rate": 18,
+            "discount": 0,
+            "currency": "INR",
+        },
+        headers={"Authorization": "Bearer inv_" + "x" * 64},
+    )
+    assert response.status_code == 401
+
+
+# ── Original tests ─────────────────────────────────────────────────────────────
 
 
 def test_checkout_session_uses_api_key_and_preserves_external_reference(client):

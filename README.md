@@ -186,6 +186,75 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 - `GET /billing/current`
 - `POST /billing/upgrade-request`
 
+### Public payment endpoints (customer-facing, no auth)
+
+These endpoints are called by the hosted payment page. They require no authentication.
+
+#### `GET /pay/{invoice_id}/public`
+
+Returns everything the payment page needs to render: invoice details, merchant info, UPI QR code, and bank transfer details.
+
+**Response**
+
+```json
+{
+  "invoice": {
+    "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "invoice_number": "INV-0001",
+    "customer_name": "Rahul Sharma",
+    "total": 29500.00,
+    "currency": "INR",
+    "status": "sent"
+  },
+  "merchant_name": "Acme Studio",
+  "upi_method": {
+    "upi_id": "merchant@okaxis",
+    "upi_name": "Acme Studio"
+  },
+  "bank_method": {
+    "bank_name": "HDFC Bank",
+    "account_holder": "Acme Studio",
+    "account_number": "00001234567890",
+    "ifsc_code": "HDFC0001234",
+    "account_type": "current"
+  },
+  "payment": null,
+  "qr_b64": "<base64-encoded PNG>"
+}
+```
+
+`payment` is `null` when no proof has been submitted yet, otherwise it reflects the latest submission.
+
+#### `POST /pay/{invoice_id}/submit`
+
+Submits a UTR / payment reference from the customer after they have made the transfer.
+
+**Request body**
+
+```json
+{
+  "utr": "UTR1234567890",
+  "customer_note": "Paid from savings account"
+}
+```
+
+`utr` must be 6–22 alphanumeric characters. `customer_note` is optional.
+
+**Response (200)**
+
+```json
+{ "message": "Payment proof submitted successfully" }
+```
+
+**Error responses**
+
+| Status | Detail |
+|--------|--------|
+| 400 | `Invoice is paid` — invoice already confirmed |
+| 400 | `Invalid UTR format. Should be 6-22 alphanumeric characters.` |
+| 400 | `This UTR has already been submitted` — duplicate submission |
+| 404 | `Invoice not found` |
+
 ## Developer integration pattern
 
 When your SaaS customer wants to collect payment:
